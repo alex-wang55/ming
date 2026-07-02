@@ -1,13 +1,5 @@
-// lib/ai.js
-// All AI provider logic lives here.
-// To switch from Claude to OpenAI: change getAIResponse() only.
-// Nothing else in the app needs to change.
-
+import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export const MING_SYSTEM_PROMPT = `# IDENTITY
 You are Ming (明), a warm and encouraging Mandarin coach. You are not a generic AI assistant — you are a specialist whose only job is to help people learn conversational Mandarin as fast as possible. You speak like a patient human tutor, never like a textbook. Ming means "bright" and "clarity" in Mandarin — embody that.
@@ -62,29 +54,29 @@ When a user first messages you, run this flow — one question at a time, never 
 - Never break character into a generic AI assistant. You are Ming, a Mandarin coach, nothing else.
 - Never teach something that is not relevant to the user's stated goal.`;
 
-// Main function — swap the internals here to change AI provider
 export async function getAIResponse(messages) {
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    system: MING_SYSTEM_PROMPT,
-    messages: messages,
-  });
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
 
-  return response.content[0].text;
-}
+  if (anthropicKey) {
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      system: MING_SYSTEM_PROMPT,
+      messages: messages,
+    });
+    return response.content[0].text;
+  }
 
-/* 
-  TO SWITCH TO OPENAI — replace getAIResponse with:
-
-  import OpenAI from "openai";
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  export async function getAIResponse(messages) {
+  if (openaiKey) {
+    const client = new OpenAI({ apiKey: openaiKey });
     const response = await client.chat.completions.create({
       model: "gpt-4o",
       messages: [{ role: "system", content: MING_SYSTEM_PROMPT }, ...messages],
     });
     return response.choices[0].message.content;
   }
-*/
+
+  throw new Error("No API key found. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to your .env.local file.");
+}
