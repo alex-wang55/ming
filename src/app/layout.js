@@ -1,4 +1,3 @@
-// app/layout.js
 import "./globals.css";
 
 export const metadata = {
@@ -9,6 +8,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+      </head>
       <body>{children}</body>
     </html>
   );

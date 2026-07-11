@@ -9,10 +9,7 @@ export default function ChatInput({ onSend, disabled }) {
   const chunks = useRef([]);
 
   function handleKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
   }
 
   function submit() {
@@ -27,13 +24,11 @@ export default function ChatInput({ onSend, disabled }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunks.current = [];
       mediaRecorder.current = new MediaRecorder(stream);
-      mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
+      mediaRecorder.current.ondataavailable = e => chunks.current.push(e.data);
       mediaRecorder.current.onstop = handleTranscribe;
       mediaRecorder.current.start();
       setRecording(true);
-    } catch {
-      alert("Microphone access denied — check your browser settings.");
-    }
+    } catch { alert("Microphone access denied."); }
   }
 
   function stopRecording() {
@@ -50,82 +45,79 @@ export default function ChatInput({ onSend, disabled }) {
       const blob = new Blob(chunks.current, { type: "audio/webm" });
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
-
       const res = await fetch("/api/transcribe", { method: "POST", body: formData });
       const data = await res.json();
-
-      if (data.text) {
-        onSend(data.text);
-      }
-    } catch {
-      alert("Transcription failed — try again.");
-    } finally {
-      setTranscribing(false);
-    }
+      if (data.text) onSend(data.text);
+    } catch { alert("Transcription failed."); }
+    finally { setTranscribing(false); }
   }
+
+  const placeholder = transcribing ? "Transcribing..." : recording ? "Recording... release to send" : "Message Ming...";
 
   return (
     <div style={styles.wrapper}>
-      <textarea
-        style={styles.input}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={transcribing ? "Transcribing..." : "Type or hold 🎤 to speak..."}
-        disabled={disabled || transcribing}
-        rows={1}
-      />
-      <button
-        style={{
-          ...styles.micBtn,
-          background: recording ? "#e53e3e" : "#2a2a2a",
-        }}
-        onMouseDown={startRecording}
-        onMouseUp={stopRecording}
-        onTouchStart={startRecording}
-        onTouchEnd={stopRecording}
-        disabled={disabled || transcribing}
-        title="Hold to speak"
-      >
-        🎤
-      </button>
-      <button
-        style={{
-          ...styles.btn,
-          opacity: !value.trim() || disabled ? 0.4 : 1,
-          cursor: !value.trim() || disabled ? "not-allowed" : "pointer",
-        }}
-        onClick={submit}
-        disabled={!value.trim() || disabled}
-      >
-        ↑
-      </button>
+      <div style={{ ...styles.inputRow, borderColor: recording ? "#e8a090" : "#e8e0d4" }}>
+        <textarea
+          style={styles.input}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={disabled || transcribing}
+          rows={1}
+        />
+        <div style={styles.actions}>
+          <button
+            style={{ ...styles.micBtn, background: recording ? "#fff0ee" : "#f5f0e8", borderColor: recording ? "#e8c0b8" : "#e8e0d4" }}
+            onMouseDown={startRecording}
+            onMouseUp={stopRecording}
+            onTouchStart={startRecording}
+            onTouchEnd={stopRecording}
+            disabled={disabled || transcribing}
+            title="Hold to speak"
+          >
+            {recording ? "⏹" : "🎤"}
+          </button>
+          <button
+            style={{ ...styles.sendBtn, opacity: !value.trim() || disabled ? 0.4 : 1, cursor: !value.trim() || disabled ? "not-allowed" : "pointer" }}
+            onClick={submit}
+            disabled={!value.trim() || disabled}
+          >
+            ↑
+          </button>
+        </div>
+      </div>
+      <p style={styles.hint}>Enter to send · Shift+Enter for new line · Hold 🎤 to speak</p>
     </div>
   );
 }
 
 const styles = {
-  wrapper: {
-    display: "flex", gap: "10px", alignItems: "flex-end",
-    background: "#1a1a1a", border: "1px solid #2a2a2a",
+  wrapper: { display: "flex", flexDirection: "column", gap: "5px" },
+  inputRow: {
+    display: "flex", alignItems: "flex-end", gap: "8px",
+    background: "#ffffff", border: "1.5px solid",
     borderRadius: "14px", padding: "10px 10px 10px 16px",
+    boxShadow: "0 1px 6px rgba(0,0,0,0.06)", transition: "border-color 0.15s",
   },
   input: {
     flex: 1, background: "transparent", border: "none", outline: "none",
-    color: "#f0f0f0", fontSize: "15px", fontFamily: "Inter, system-ui, sans-serif",
+    color: "#2d2520", fontSize: "15px", fontFamily: "Inter, system-ui, sans-serif",
     lineHeight: "1.5", resize: "none", maxHeight: "120px", overflowY: "auto",
   },
+  actions: { display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 },
   micBtn: {
     width: "34px", height: "34px", borderRadius: "9px",
-    border: "none", fontSize: "16px", cursor: "pointer",
+    border: "1px solid", fontSize: "15px", cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
-    flexShrink: 0, transition: "background 0.15s",
+    transition: "all 0.15s",
   },
-  btn: {
+  sendBtn: {
     width: "34px", height: "34px", borderRadius: "9px",
-    background: "#d4a843", border: "none", color: "#0f0f0f",
-    fontSize: "18px", fontWeight: 600, display: "flex",
-    alignItems: "center", justifyContent: "center",
-    flexShrink: 0, transition: "opacity 0.15s",
+    background: "linear-gradient(135deg,#8b6a3a,#6a4a2a)",
+    border: "none", color: "#fff", fontSize: "18px", fontWeight: 700,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 2px 8px rgba(139,106,58,0.2)", transition: "opacity 0.15s",
   },
+  hint: { fontSize: "11px", color: "#ccc", textAlign: "center", margin: 0 },
 };
