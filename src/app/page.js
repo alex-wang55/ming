@@ -148,7 +148,71 @@ export default function Home() {
     }
   }
 
-  if (authLoading) return <div style={styles.loading}><span style={styles.loadingChar}>明</span></div>;
+  if (authLoading) return (
+    <div style={styles.loading}>
+      <style>{`
+        @keyframes mingPulse {
+          0%, 100% { opacity: 0.4; transform: scale(0.95); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes dotBounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+          40% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes shimmerRing {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      {/* Decorative background chars */}
+      <div style={{ position: "absolute", fontSize: "160px", fontFamily: "'Noto Sans SC', sans-serif", color: "rgba(139,106,58,0.05)", top: "5%", right: "-20px", lineHeight: 1, pointerEvents: "none" }}>语</div>
+      <div style={{ position: "absolute", fontSize: "160px", fontFamily: "'Noto Sans SC', sans-serif", color: "rgba(139,106,58,0.05)", bottom: "5%", left: "-20px", lineHeight: 1, pointerEvents: "none" }}>学</div>
+
+      {/* Spinning ring */}
+      <div style={{ position: "relative", width: "80px", height: "80px" }}>
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: "2px solid #e8d4a8",
+        }} />
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: "2px solid transparent",
+          borderTopColor: "#8b6a3a",
+          animation: "shimmerRing 1.2s linear infinite",
+        }} />
+        <div style={{
+          position: "absolute", inset: "10px", borderRadius: "50%",
+          background: "linear-gradient(135deg, #fff7ec, #f5e8d0)",
+          border: "1px solid #e8d4a8",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <span style={styles.loadingChar}>明</span>
+        </div>
+      </div>
+
+      {/* App name */}
+      <div style={{ textAlign: "center", animation: "fadeInUp 0.6s ease forwards" }}>
+        <p style={{ fontSize: "22px", fontWeight: 600, color: "#2d2520", fontFamily: "Georgia, serif", margin: "0 0 4px" }}>Ming</p>
+        <p style={{ fontSize: "13px", color: "#b89860", margin: 0 }}>Your Mandarin coach</p>
+      </div>
+
+      {/* Bouncing dots */}
+      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        {[0, 0.2, 0.4].map((delay, i) => (
+          <div key={i} style={{
+            width: "6px", height: "6px", borderRadius: "50%",
+            background: "#c4a868",
+            animation: `dotBounce 1.2s ease-in-out ${delay}s infinite`,
+          }} />
+        ))}
+      </div>
+    </div>
+  );
   if (!user) return <Auth />;
 
   return (
@@ -252,8 +316,8 @@ function TypingIndicator() {
 
 const styles = {
   page: { display: "flex", height: "100vh", width: "100%", background: "#faf8f4" },
-  loading: { height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#faf8f4" },
-  loadingChar: { fontSize: "36px", fontFamily: "'Noto Sans SC', sans-serif", color: "#8b6a3a" },
+  loading: { height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5ede0", gap: "20px", position: "relative", overflow: "hidden" },
+  loadingChar: { fontSize: "52px", fontFamily: "'Noto Sans SC', sans-serif", color: "#8b6a3a", animation: "mingPulse 1.8s ease-in-out infinite" },
   content: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
   header: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
