@@ -223,6 +223,7 @@ export default function Home() {
               onStartLesson={handleStartLesson}
               wordCount={wordCount}
               streak={streak}
+              theme={theme}
             />
           </div>
         )}
@@ -269,7 +270,7 @@ export default function Home() {
 
         {tab === "words" && (
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <WordsTab userId={user.id} />
+            <WordsTab userId={user.id} theme={theme} />
           </div>
         )}
 
