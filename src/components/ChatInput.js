@@ -1,12 +1,13 @@
 "use client";
 import { useState, useRef } from "react";
 
-export default function ChatInput({ onSend, disabled }) {
+export default function ChatInput({ onSend, disabled, theme }) {
   const [value, setValue] = useState("");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const mediaRecorder = useRef(null);
   const chunks = useRef([]);
+  const isDark = theme === "dark";
 
   function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
@@ -55,10 +56,22 @@ export default function ChatInput({ onSend, disabled }) {
   const placeholder = transcribing ? "Transcribing..." : recording ? "Recording... release to send" : "Message Ming...";
 
   return (
-    <div style={styles.wrapper}>
-      <div style={{ ...styles.inputRow, borderColor: recording ? "#e8a090" : "#e8e0d4" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+      <div style={{
+        display: "flex", alignItems: "flex-end", gap: "8px",
+        background: isDark ? "#111110" : "#ffffff",
+        border: `1.5px solid ${recording ? (isDark ? "rgba(212,68,68,0.4)" : "#e8a090") : (isDark ? "rgba(212,168,67,0.18)" : "#e8e0d4")}`,
+        borderRadius: "14px", padding: "10px 10px 10px 16px",
+        boxShadow: isDark ? "0 2px 20px rgba(0,0,0,0.3)" : "0 1px 6px rgba(0,0,0,0.06)",
+        transition: "border-color 0.15s",
+      }}>
         <textarea
-          style={styles.input}
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            color: isDark ? "#f0ece0" : "#2d2520",
+            fontSize: "15px", fontFamily: "Inter, system-ui, sans-serif",
+            lineHeight: "1.5", resize: "none", maxHeight: "120px", overflowY: "auto",
+          }}
           value={value}
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -66,20 +79,34 @@ export default function ChatInput({ onSend, disabled }) {
           disabled={disabled || transcribing}
           rows={1}
         />
-        <div style={styles.actions}>
+        <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
           <button
-            style={{ ...styles.micBtn, background: recording ? "#fff0ee" : "#f5f0e8", borderColor: recording ? "#e8c0b8" : "#e8e0d4" }}
+            style={{
+              width: "34px", height: "34px", borderRadius: "9px", fontSize: "15px", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s",
+              background: recording ? "rgba(212,68,68,0.1)" : (isDark ? "rgba(212,168,67,0.06)" : "#f5f0e8"),
+              border: `1px solid ${recording ? "rgba(212,68,68,0.3)" : (isDark ? "rgba(212,168,67,0.15)" : "#e8e0d4")}`,
+            }}
             onMouseDown={startRecording}
             onMouseUp={stopRecording}
             onTouchStart={startRecording}
             onTouchEnd={stopRecording}
             disabled={disabled || transcribing}
-            title="Hold to speak"
           >
             {recording ? "⏹" : "🎤"}
           </button>
           <button
-            style={{ ...styles.sendBtn, opacity: !value.trim() || disabled ? 0.4 : 1, cursor: !value.trim() || disabled ? "not-allowed" : "pointer" }}
+            style={{
+              width: "34px", height: "34px", borderRadius: "9px",
+              background: isDark ? "linear-gradient(135deg,#d4a843,#b8912e)" : "linear-gradient(135deg,#8b6a3a,#6a4a2a)",
+              border: "none", color: isDark ? "#0a0a08" : "#fff7ec",
+              fontSize: "18px", fontWeight: 700,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: isDark ? "0 2px 12px rgba(212,168,67,0.25)" : "0 2px 8px rgba(139,106,58,0.2)",
+              transition: "opacity 0.15s",
+              opacity: !value.trim() || disabled ? 0.3 : 1,
+              cursor: !value.trim() || disabled ? "not-allowed" : "pointer",
+            }}
             onClick={submit}
             disabled={!value.trim() || disabled}
           >
@@ -87,37 +114,9 @@ export default function ChatInput({ onSend, disabled }) {
           </button>
         </div>
       </div>
-      <p style={styles.hint}>Enter to send · Shift+Enter for new line · Hold 🎤 to speak</p>
+      <p style={{ fontSize: "11px", color: isDark ? "rgba(212,168,67,0.2)" : "#ccc", textAlign: "center", margin: 0 }}>
+        Enter to send · Shift+Enter for new line · Hold 🎤 to speak
+      </p>
     </div>
   );
 }
-
-const styles = {
-  wrapper: { display: "flex", flexDirection: "column", gap: "5px" },
-  inputRow: {
-    display: "flex", alignItems: "flex-end", gap: "8px",
-    background: "#ffffff", border: "1.5px solid",
-    borderRadius: "14px", padding: "10px 10px 10px 16px",
-    boxShadow: "0 1px 6px rgba(0,0,0,0.06)", transition: "border-color 0.15s",
-  },
-  input: {
-    flex: 1, background: "transparent", border: "none", outline: "none",
-    color: "#2d2520", fontSize: "15px", fontFamily: "Inter, system-ui, sans-serif",
-    lineHeight: "1.5", resize: "none", maxHeight: "120px", overflowY: "auto",
-  },
-  actions: { display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 },
-  micBtn: {
-    width: "34px", height: "34px", borderRadius: "9px",
-    border: "1px solid", fontSize: "15px", cursor: "pointer",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    transition: "all 0.15s",
-  },
-  sendBtn: {
-    width: "34px", height: "34px", borderRadius: "9px",
-    background: "linear-gradient(135deg,#8b6a3a,#6a4a2a)",
-    border: "none", color: "#fff", fontSize: "18px", fontWeight: 700,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    boxShadow: "0 2px 8px rgba(139,106,58,0.2)", transition: "opacity 0.15s",
-  },
-  hint: { fontSize: "11px", color: "#ccc", textAlign: "center", margin: 0 },
-};

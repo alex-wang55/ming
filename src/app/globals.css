@@ -19,6 +19,20 @@
   --font-cn: 'Noto Sans SC', sans-serif;
 }
 
+/* Dark mode tokens — applied via JS but defined here for reference */
+:root {
+  --ming-black: #0a0a08;
+  --ming-surface: #111110;
+  --ming-surface-2: #161614;
+  --ming-border: rgba(212,168,67,0.12);
+  --ming-border-strong: rgba(212,168,67,0.22);
+  --ming-gold: #d4a843;
+  --ming-gold-dim: rgba(212,168,67,0.08);
+  --ming-text: #f0ece0;
+  --ming-text-muted: #5a5648;
+  --ming-text-secondary: #8a8272;
+}
+
 html, body { height: 100%; }
 
 body {

@@ -239,7 +239,7 @@ export default function Home() {
                 </div>
               )}
               <div style={styles.messages}>
-                {messages.map((msg, i) => <Message key={i} message={msg} />)}
+                {messages.map((msg, i) => <Message key={i} message={msg} theme={theme} />)}
                 {loading && <TypingIndicator isDark={isDark} />}
                 <div ref={bottomRef} />
               </div>
@@ -256,7 +256,7 @@ export default function Home() {
                     </button>
                   </div>
                 )}
-                <ChatInput onSend={sendMessage} disabled={loading} />
+                <ChatInput onSend={sendMessage} disabled={loading} theme={theme} />
               </div>
             </footer>
           </>
