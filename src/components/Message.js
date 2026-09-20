@@ -1,44 +1,100 @@
 "use client";
 import { useState } from "react";
+import { themes, font, radius } from "@/lib/theme";
+import { ToneGraph } from "@/components/ToneContour";
 
 export default function Message({ message, theme }) {
+  const t = themes[theme];
   const isAI = message.role === "assistant";
-  const isDark = theme === "dark";
+
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", justifyContent: isAI ? "flex-start" : "flex-end" }}>
-      {isAI && <Avatar isDark={isDark} />}
-      <div style={isAI ? {
-        background: isDark ? "#111110" : "#ffffff",
-        border: `1px solid ${isDark ? "rgba(212,168,67,0.1)" : "#e8e0d4"}`,
-        borderRadius: "14px 14px 14px 3px",
-        padding: "12px 16px", maxWidth: "80%",
-        boxShadow: isDark ? "0 2px 12px rgba(0,0,0,0.4)" : "0 1px 4px rgba(0,0,0,0.06)",
-      } : {
-        background: "#fff7ec",
-        border: "1px solid #e8d4a8",
-        borderRadius: "14px 14px 3px 14px",
-        padding: "12px 16px", maxWidth: "80%",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-      }}>
-        <FormattedContent content={message.content} isDark={isDark} />
+    <div
+      className="fade-up"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "10px",
+        justifyContent: isAI ? "flex-start" : "flex-end",
+      }}
+    >
+      {isAI && (
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: radius.full,
+            border: `1px solid ${t.accentBorder}`,
+            background: t.accentSoft,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            marginTop: "2px",
+          }}
+        >
+          <span style={{ fontFamily: font.cn, fontSize: "12px", color: t.accent, fontWeight: 700 }}>明</span>
+        </div>
+      )}
+
+      <div
+        style={{
+          background: isAI ? t.surface : t.accentSoft,
+          border: `1px solid ${isAI ? t.border : t.accentBorder}`,
+          borderRadius: isAI
+            ? `${radius.lg} ${radius.lg} ${radius.lg} 4px`
+            : `${radius.lg} ${radius.lg} 4px ${radius.lg}`,
+          padding: "11px 15px",
+          maxWidth: "76%",
+          boxShadow: t.shadow,
+        }}
+      >
+        <Content content={message.content} t={t} />
       </div>
     </div>
   );
 }
 
-function FormattedContent({ content, isDark }) {
-  const parts = content.split(/([\u4e00-\u9fff\u3400-\u4dbf，。！？、：；""''（）【】《》]+)/g);
+function Content({ content, t }) {
+  const toneMatches = [...content.matchAll(/\[TONE:([^|]+)\|([^|]+)\|(\d)\|([^\]]+)\]/g)];
+  const cleanText = content.replace(/\[TONE:[^\]]+\]/g, "").trim();
+  const parts = cleanText.split(/([\u4e00-\u9fff\u3400-\u4dbf]+)/g);
+
   return (
-    <p style={{ fontSize: "15px", lineHeight: "1.65", color: isDark ? "#f0ece0" : "#2d2520", margin: 0, whiteSpace: "pre-wrap" }}>
-      {parts.map((part, i) => {
-        const isChinese = /[\u4e00-\u9fff]/.test(part);
-        return isChinese ? <ChineseWord key={i} text={part} isDark={isDark} /> : part;
-      })}
-    </p>
+    <div>
+      <p style={{ fontSize: "14.5px", lineHeight: 1.65, color: t.text, margin: 0, whiteSpace: "pre-wrap" }}>
+        {parts.map((part, i) =>
+          /[\u4e00-\u9fff]/.test(part) ? <Hanzi key={i} text={part} t={t} /> : part
+        )}
+      </p>
+
+      {toneMatches.length > 0 && (
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
+          {toneMatches.map(([, hanzi, pinyin, tone, meaning], i) => (
+            <div
+              key={i}
+              style={{
+                background: t.bg,
+                border: `1px solid ${t.border}`,
+                borderRadius: "8px",
+                padding: "8px 10px",
+                minWidth: "90px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "baseline", gap: "5px", marginBottom: "5px" }}>
+                <span style={{ fontFamily: font.cn, fontSize: "15px", color: t.accent }}>{hanzi}</span>
+                <span style={{ fontSize: "10px", color: t.textSecondary, fontStyle: "italic" }}>{pinyin}</span>
+              </div>
+              <ToneGraph tone={parseInt(tone)} color={t.accent} height={16} />
+              <p style={{ fontSize: "9.5px", color: t.textMuted, margin: "4px 0 0" }}>{meaning}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
-function ChineseWord({ text, isDark }) {
+function Hanzi({ text, t }) {
   const [playing, setPlaying] = useState(false);
 
   async function speak() {
@@ -55,24 +111,55 @@ function ChineseWord({ text, isDark }) {
         const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
         audio.onended = () => setPlaying(false);
         audio.play();
-      }
-    } catch { setPlaying(false); }
+      } else setPlaying(false);
+    } catch {
+      setPlaying(false);
+    }
   }
 
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
-      <span style={{ fontFamily: "'Noto Sans SC', sans-serif", color: "#d4a843", fontWeight: 500, background: isDark ? "rgba(212,168,67,0.08)" : "#fff7ec", borderRadius: "4px", padding: "0 3px" }}>{text}</span>
-      <button onClick={speak} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", padding: "0 2px", lineHeight: 1, opacity: playing ? 0.5 : 1, transition: "opacity 0.15s" }}>
-        {playing ? "🔊" : "🔈"}
-      </button>
-    </span>
+    <button
+      onClick={speak}
+      title="Play pronunciation"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "3px",
+        fontFamily: font.cn,
+        fontSize: "16px",
+        fontWeight: 500,
+        color: t.accent,
+        background: "transparent",
+        border: "none",
+        borderBottom: `1px dotted ${t.accentBorder}`,
+        padding: "0 1px",
+        margin: 0,
+        lineHeight: 1.4,
+        opacity: playing ? 0.55 : 1,
+        transition: "opacity 0.15s",
+      }}
+    >
+      {text}
+      <SpeakerIcon color={t.textMuted} animated={playing} />
+    </button>
   );
 }
 
-function Avatar({ isDark }) {
+function SpeakerIcon({ color, animated }) {
   return (
-    <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: isDark ? "transparent" : "#fff7ec", border: `1px solid ${isDark ? "rgba(212,168,67,0.3)" : "#e8d4a8"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-      <span style={{ fontFamily: "'Noto Sans SC', sans-serif", fontSize: "13px", color: "#d4a843", fontWeight: 700 }}>明</span>
-    </div>
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0, animation: animated ? "pulse 0.8s ease-in-out infinite" : "none" }}
+    >
+      <path d="M11 5 6 9H2v6h4l5 4z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+    </svg>
   );
 }

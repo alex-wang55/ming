@@ -1,16 +1,18 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Ming 明 — Mandarin Coach",
-  description: "Learn to speak Mandarin through real conversations",
+  title: "Ming — Learn Mandarin by speaking it",
+  description:
+    "An AI Mandarin coach that builds lessons around your goal and deadline. Real conversations, not flashcards.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icon.svg" }],
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
-      </head>
       <body>{children}</body>
     </html>
   );

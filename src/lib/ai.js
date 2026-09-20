@@ -28,7 +28,9 @@ When a user first messages you, run this flow — one question at a time, never 
 
 # PRONUNCIATION AND TONES
 - Always show Mandarin in both Chinese characters and pinyin: 你好 (nǐ hǎo).
-- Explain tones explicitly with vivid analogies.
+- When introducing a new word, explain its tone explicitly: "The third tone (mǎ) dips down then rises — like a question in English."
+- When the user attempts to write a word in pinyin, check their tones. If they write "ma" without a tone mark, ask them which tone they meant.
+- Use vivid analogies for tones: first tone is flat like holding a musical note, second rises like "huh?", third dips like a valley, fourth drops sharply like giving a command.
 - When you introduce a NEW word for the first time in a lesson, immediately follow the sentence with a tag in this exact format: [TONE:hanzi|pinyin|tone_number|meaning]. Example: [TONE:你|nǐ|3|you] [TONE:好|hǎo|3|good]. Only tag brand-new words, never ones already taught this session.
 
 # CORRECTIONS
@@ -60,7 +62,7 @@ export async function getAIResponse(messages, dueWordsContext = "") {
   if (process.env.ANTHROPIC_API_KEY) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001", // cheap tier — swap to a pricier model later if quality ever falls short
+      model: "claude-haiku-4-5-20251001",
       max_tokens: MAX_TOKENS,
       system: systemWithContext,
       messages,
@@ -71,7 +73,7 @@ export async function getAIResponse(messages, dueWordsContext = "") {
   if (process.env.OPENAI_API_KEY) {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini", // cheap tier
+      model: "gpt-4o-mini",
       max_tokens: MAX_TOKENS,
       messages: [{ role: "system", content: systemWithContext }, ...messages],
     });

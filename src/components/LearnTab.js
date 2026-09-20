@@ -1,20 +1,19 @@
 "use client";
 import { LESSONS } from "@/lib/lessons";
 import RightPanel from "@/components/RightPanel";
+import { themes, radius } from "@/lib/theme";
 
-export default function LearnTab({ completedLessons, onStartLesson, wordCount, streak, theme }) {
-  const isDark = theme === "dark";
-  const totalLessons = LESSONS.reduce((s, w) => s + w.lessons.length, 0);
-  const completedCount = completedLessons.length;
+export default function LearnTab({ completedLessons, onStartLesson, wordCount, streak, activity, theme, goalText, deadlineDate }) {  const t = themes[theme];
+  const total = LESSONS.reduce((s, w) => s + w.lessons.length, 0);
+  const done = completedLessons.length;
 
-  function getLessonState(lessonId, weekIdx, lessonIdx) {
-    if (completedLessons.includes(lessonId)) return "done";
+  function stateOf(weekIdx, lessonIdx) {
+    const id = LESSONS[weekIdx].lessons[lessonIdx].id;
+    if (completedLessons.includes(id)) return "done";
     for (let wi = 0; wi < LESSONS.length; wi++) {
       for (let li = 0; li < LESSONS[wi].lessons.length; li++) {
-        const id = LESSONS[wi].lessons[li].id;
-        if (!completedLessons.includes(id)) {
-          if (wi === weekIdx && li === lessonIdx) return "active";
-          return "locked";
+        if (!completedLessons.includes(LESSONS[wi].lessons[li].id)) {
+          return wi === weekIdx && li === lessonIdx ? "active" : "locked";
         }
       }
     }
@@ -23,91 +22,219 @@ export default function LearnTab({ completedLessons, onStartLesson, wordCount, s
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      {/* Lesson path */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", background: isDark ? "#080808" : "#faf8f4" }}>
-        {/* Progress bar */}
-        <div style={{ height: "3px", background: isDark ? "#1a1a1a" : "#e8e0d4", borderRadius: "2px", marginBottom: "24px", overflow: "hidden" }}>
-          <div style={{ height: "100%", background: isDark ? "linear-gradient(90deg,#8b6a2a,#d4a843)" : "linear-gradient(90deg,#c8dab8,#4a8a4a)", borderRadius: "2px", width: `${(completedCount / totalLessons) * 100}%`, transition: "width 0.4s ease" }} />
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px", background: t.bg }}>
+        <div style={{ maxWidth: "460px", marginBottom: "28px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
+            <span style={{ fontSize: "12px", color: t.textSecondary }}>Overall progress</span>
+            <span style={{ fontSize: "12px", color: t.accent, fontWeight: 600 }}>
+              {done} of {total}
+            </span>
+          </div>
+          <div style={{ height: "4px", background: t.border, borderRadius: radius.full, overflow: "hidden" }}>
+            <div
+              style={{
+                height: "100%",
+                width: `${(done / total) * 100}%`,
+                background: t.accent,
+                borderRadius: radius.full,
+                transition: "width 0.5s cubic-bezier(0.4,0,0.2,1)",
+              }}
+            />
+          </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "28px", maxWidth: "440px" }}>
-          {LESSONS.map((week, wi) => (
-            <div key={wi}>
-              <div style={{ marginBottom: "14px" }}>
-                <p style={{ fontSize: "14px", fontWeight: 600, color: isDark ? "#f0f0f0" : "#2d2520", margin: "0 0 2px", fontFamily: "Georgia, serif" }}>{week.weekTitle}</p>
-                <p style={{ fontSize: "12px", color: isDark ? "#555" : "#bbb", margin: 0 }}>{week.weekSub}</p>
-              </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "32px", maxWidth: "460px" }}>
+          {LESSONS.map((week, wi) => {
+            const weekDone = week.lessons.filter((l) => completedLessons.includes(l.id)).length;
+            return (
+              <section key={wi}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <div>
+                    <h2 style={{ fontSize: "14px", fontWeight: 600, color: t.text, margin: "0 0 2px", letterSpacing: "-0.01em" }}>
+                      {week.weekTitle}
+                    </h2>
+                    <p style={{ fontSize: "12px", color: t.textMuted, margin: 0 }}>{week.weekSub}</p>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      color: weekDone === week.lessons.length ? t.success : t.textFaint,
+                    }}
+                  >
+                    {weekDone}/{week.lessons.length}
+                  </span>
+                </div>
 
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
-                {week.lessons.map((lesson, li) => {
-                  const state = getLessonState(lesson.id, wi, li);
-                  const isDone = state === "done";
-                  const isActive = state === "active";
-                  const isLocked = state === "locked";
-
-                  return (
-                    <div key={lesson.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      {li > 0 && (
-                        <div style={{ width: "1.5px", height: "16px", background: isDark ? (completedLessons.includes(week.lessons[li - 1].id) ? "#d4a843" : "#1a1a1a") : (completedLessons.includes(week.lessons[li - 1].id) ? "#c8dab8" : "#e8e0d4") }} />
-                      )}
-                      <div
-                        style={{
-                          width: "100%", borderRadius: "10px", padding: "12px 14px",
-                          display: "flex", alignItems: "center", gap: "12px",
-                          cursor: isLocked ? "not-allowed" : "pointer",
-                          opacity: isLocked ? 0.4 : 1,
-                          transition: "all 0.15s",
-                          background: isDark
-                            ? isDone ? "#0a1a0a" : isActive ? "rgba(212,168,67,0.05)" : "#0d0d0d"
-                            : isDone ? "#fafdf8" : isActive ? "#fffdf8" : "#fff",
-                          border: isDark
-                            ? isDone ? "1px solid #1a3a1a" : isActive ? "1.5px solid rgba(212,168,67,0.3)" : "1px solid #1a1a1a"
-                            : isDone ? "1px solid #c8dab8" : isActive ? "1.5px solid #e8d4a8" : "1px solid #e8e0d4",
-                          boxShadow: isActive ? (isDark ? "0 2px 12px rgba(212,168,67,0.08)" : "0 2px 8px rgba(212,168,67,0.12)") : "none",
-                        }}
-                        onClick={() => !isLocked && onStartLesson(lesson)}
-                      >
-                        <div style={{
-                          width: "36px", height: "36px", borderRadius: "9px",
-                          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                          background: isDark
-                            ? isDone ? "#0a2a0a" : isActive ? "rgba(212,168,67,0.1)" : "#111"
-                            : isDone ? "#eef5e8" : isActive ? "#fff7ec" : "#f5f0e8",
-                          border: isDark
-                            ? isDone ? "1px solid #1a4a1a" : isActive ? "1px solid rgba(212,168,67,0.25)" : "1px solid #222"
-                            : isDone ? "1px solid #c8dab8" : isActive ? "1px solid #e8d4a8" : "1px solid #e8e0d4",
-                        }}>
-                          <i className={`ti ${lesson.icon}`} style={{ fontSize: "16px", color: isDark ? (isDone ? "#4a9a4a" : isActive ? "#d4a843" : "#333") : (isDone ? "#4a8a4a" : isActive ? "#d4a050" : "#ccc") }} aria-hidden="true" />
-                        </div>
-
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontSize: "13px", fontWeight: 500, margin: "0 0 2px", color: isDark ? (isDone ? "#4a9a4a" : isActive ? "#d4a843" : "#333") : (isDone ? "#4a8a4a" : isActive ? "#8b6a3a" : "#ccc") }}>
-                            {lesson.title}
-                          </p>
-                          <p style={{ fontSize: "11px", color: isDark ? "#444" : "#bbb", margin: 0 }}>{lesson.sub}</p>
-                        </div>
-
-                        {isDone && <i className="ti ti-circle-check" style={{ fontSize: "16px", color: isDark ? "#4a9a4a" : "#4a8a4a", flexShrink: 0 }} aria-hidden="true" />}
-                        {isActive && <span style={{ fontSize: "11px", background: isDark ? "rgba(212,168,67,0.1)" : "#fff7ec", border: `1px solid ${isDark ? "rgba(212,168,67,0.2)" : "#e8d4a8"}`, color: isDark ? "#d4a843" : "#d4a050", borderRadius: "20px", padding: "3px 9px", fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0 }}>Continue →</span>}
-                        {isLocked && <i className="ti ti-lock" style={{ fontSize: "13px", color: isDark ? "#222" : "#ddd", flexShrink: 0 }} aria-hidden="true" />}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {week.lessons.map((lesson, li) => {
+                    const state = stateOf(wi, li);
+                    const prevDone = li > 0 && completedLessons.includes(week.lessons[li - 1].id);
+                    return (
+                      <div key={lesson.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        {li > 0 && (
+                          <div
+                            style={{
+                              width: "2px",
+                              height: "14px",
+                              background: prevDone ? t.accent : t.border,
+                              opacity: prevDone ? 0.35 : 1,
+                            }}
+                          />
+                        )}
+                        <LessonRow
+                          lesson={lesson}
+                          state={state}
+                          t={t}
+                          onClick={() => state !== "locked" && onStartLesson(lesson)}
+                        />
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </div>
 
-      {/* Right panel */}
       <RightPanel
         completedLessons={completedLessons}
         wordCount={wordCount}
         streak={streak}
+        activity={activity}
         onStartLesson={onStartLesson}
         theme={theme}
+        goalText={goalText}
+        deadlineDate={deadlineDate}
       />
     </div>
+  );
+}
+
+function LessonRow({ lesson, state, t, onClick }) {
+  const done = state === "done";
+  const active = state === "active";
+  const locked = state === "locked";
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={locked}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        borderRadius: radius.md,
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: "13px",
+        background: active ? t.accentSoft : t.surface,
+        border: `1px solid ${done ? t.successBorder : active ? t.accentBorder : t.border}`,
+        opacity: locked ? 0.42 : 1,
+        cursor: locked ? "not-allowed" : "pointer",
+        boxShadow: active ? t.shadowLg : t.shadow,
+        transition: "all 0.15s ease",
+      }}
+    >
+      <div
+        style={{
+          width: "34px",
+          height: "34px",
+          borderRadius: radius.sm,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          background: done ? t.successSoft : active ? t.accentSoft : "transparent",
+          border: `1px solid ${done ? t.successBorder : active ? t.accentBorder : t.border}`,
+          color: done ? t.success : active ? t.accent : t.textFaint,
+        }}
+      >
+        {done ? <CheckIcon /> : locked ? <LockIcon /> : <DotIcon />}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontSize: "13.5px",
+            fontWeight: 500,
+            margin: "0 0 2px",
+            color: done ? t.success : active ? t.accent : locked ? t.textFaint : t.text,
+          }}
+        >
+          {lesson.title}
+        </p>
+        <p
+          style={{
+            fontSize: "11.5px",
+            color: t.textMuted,
+            margin: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {lesson.sub}
+        </p>
+      </div>
+
+      {active && (
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            color: t.accent,
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            flexShrink: 0,
+          }}
+        >
+          Continue <ChevronIcon />
+        </span>
+      )}
+    </button>
+  );
+}
+
+const sv = {
+  width: 15,
+  height: 15,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2.2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+};
+function CheckIcon() {
+  return (
+    <svg {...sv}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+function LockIcon() {
+  return (
+    <svg {...sv} strokeWidth={2}>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+function DotIcon() {
+  return (
+    <svg {...sv}>
+      <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
   );
 }
