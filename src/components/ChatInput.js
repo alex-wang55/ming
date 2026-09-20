@@ -1,17 +1,21 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { themes, radius } from "@/lib/theme";
 
 export default function ChatInput({ onSend, disabled, theme }) {
   const [value, setValue] = useState("");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const mediaRecorder = useRef(null);
+  const recorder = useRef(null);
   const chunks = useRef([]);
-  const isDark = theme === "dark";
+  const ta = useRef(null);
+  const t = themes[theme];
 
-  function handleKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
-  }
+  useEffect(() => {
+    if (!ta.current) return;
+    ta.current.style.height = "auto";
+    ta.current.style.height = Math.min(ta.current.scrollHeight, 140) + "px";
+  }, [value]);
 
   function submit() {
     const text = value.trim();
@@ -20,103 +24,165 @@ export default function ChatInput({ onSend, disabled, theme }) {
     setValue("");
   }
 
-  async function startRecording() {
+  async function startRec() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunks.current = [];
-      mediaRecorder.current = new MediaRecorder(stream);
-      mediaRecorder.current.ondataavailable = e => chunks.current.push(e.data);
-      mediaRecorder.current.onstop = handleTranscribe;
-      mediaRecorder.current.start();
+      recorder.current = new MediaRecorder(stream);
+      recorder.current.ondataavailable = (e) => chunks.current.push(e.data);
+      recorder.current.onstop = transcribe;
+      recorder.current.start();
       setRecording(true);
-    } catch { alert("Microphone access denied."); }
-  }
-
-  function stopRecording() {
-    if (mediaRecorder.current) {
-      mediaRecorder.current.stop();
-      mediaRecorder.current.stream.getTracks().forEach(t => t.stop());
-      setRecording(false);
-      setTranscribing(true);
+    } catch {
+      alert("Microphone access denied. Check your browser settings.");
     }
   }
 
-  async function handleTranscribe() {
-    try {
-      const blob = new Blob(chunks.current, { type: "audio/webm" });
-      const formData = new FormData();
-      formData.append("audio", blob, "recording.webm");
-      const res = await fetch("/api/transcribe", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.text) onSend(data.text);
-    } catch { alert("Transcription failed."); }
-    finally { setTranscribing(false); }
+  function stopRec() {
+    if (!recorder.current) return;
+    recorder.current.stop();
+    recorder.current.stream.getTracks().forEach((tr) => tr.stop());
+    setRecording(false);
+    setTranscribing(true);
   }
 
-  const placeholder = transcribing ? "Transcribing..." : recording ? "Recording... release to send" : "Message Ming...";
+  async function transcribe() {
+    try {
+      const blob = new Blob(chunks.current, { type: "audio/webm" });
+      const fd = new FormData();
+      fd.append("audio", blob, "rec.webm");
+      const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.text) onSend(data.text);
+    } catch {
+      alert("Transcription failed. Try again.");
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
+  const busy = disabled || transcribing;
+  const canSend = value.trim() && !busy;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-      <div style={{
-        display: "flex", alignItems: "flex-end", gap: "8px",
-        background: isDark ? "#111110" : "#ffffff",
-        border: `1.5px solid ${recording ? (isDark ? "rgba(212,68,68,0.4)" : "#e8a090") : (isDark ? "rgba(212,168,67,0.18)" : "#e8e0d4")}`,
-        borderRadius: "14px", padding: "10px 10px 10px 16px",
-        boxShadow: isDark ? "0 2px 20px rgba(0,0,0,0.3)" : "0 1px 6px rgba(0,0,0,0.06)",
-        transition: "border-color 0.15s",
-      }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: "8px",
+          background: t.surface,
+          border: `1px solid ${recording ? t.danger : t.border}`,
+          borderRadius: radius.lg,
+          padding: "8px 8px 8px 14px",
+          boxShadow: t.shadow,
+          transition: "border-color 0.15s",
+        }}
+      >
         <textarea
-          style={{
-            flex: 1, background: "transparent", border: "none", outline: "none",
-            color: isDark ? "#f0ece0" : "#2d2520",
-            fontSize: "15px", fontFamily: "Inter, system-ui, sans-serif",
-            lineHeight: "1.5", resize: "none", maxHeight: "120px", overflowY: "auto",
-          }}
-          value={value}
-          onChange={e => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled || transcribing}
+          ref={ta}
           rows={1}
+          value={value}
+          disabled={busy}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder={
+            transcribing ? "Transcribing your audio..." : recording ? "Listening..." : "Message Ming"
+          }
+          style={{
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            color: t.text,
+            fontSize: "14.5px",
+            lineHeight: 1.55,
+            resize: "none",
+            overflowY: "auto",
+            maxHeight: "140px",
+            paddingTop: "7px",
+            paddingBottom: "7px",
+          }}
         />
-        <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
-          <button
+
+        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+          <IconButton
+            onMouseDown={startRec}
+            onMouseUp={stopRec}
+            onTouchStart={startRec}
+            onTouchEnd={stopRec}
+            disabled={busy}
+            title="Hold to speak"
             style={{
-              width: "34px", height: "34px", borderRadius: "9px", fontSize: "15px", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s",
-              background: recording ? "rgba(212,68,68,0.1)" : (isDark ? "rgba(212,168,67,0.06)" : "#f5f0e8"),
-              border: `1px solid ${recording ? "rgba(212,68,68,0.3)" : (isDark ? "rgba(212,168,67,0.15)" : "#e8e0d4")}`,
+              background: recording ? `${t.danger}1a` : "transparent",
+              border: `1px solid ${recording ? t.danger : t.border}`,
+              color: recording ? t.danger : t.textMuted,
             }}
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onTouchStart={startRecording}
-            onTouchEnd={stopRecording}
-            disabled={disabled || transcribing}
           >
-            {recording ? "⏹" : "🎤"}
-          </button>
-          <button
-            style={{
-              width: "34px", height: "34px", borderRadius: "9px",
-              background: isDark ? "linear-gradient(135deg,#d4a843,#b8912e)" : "linear-gradient(135deg,#8b6a3a,#6a4a2a)",
-              border: "none", color: isDark ? "#0a0a08" : "#fff7ec",
-              fontSize: "18px", fontWeight: 700,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: isDark ? "0 2px 12px rgba(212,168,67,0.25)" : "0 2px 8px rgba(139,106,58,0.2)",
-              transition: "opacity 0.15s",
-              opacity: !value.trim() || disabled ? 0.3 : 1,
-              cursor: !value.trim() || disabled ? "not-allowed" : "pointer",
-            }}
+            <MicIcon />
+          </IconButton>
+
+          <IconButton
             onClick={submit}
-            disabled={!value.trim() || disabled}
+            disabled={!canSend}
+            title="Send"
+            style={{
+              background: canSend ? t.accent : "transparent",
+              border: `1px solid ${canSend ? t.accent : t.border}`,
+              color: canSend ? t.btnText : t.textFaint,
+            }}
           >
-            ↑
-          </button>
+            <ArrowUpIcon />
+          </IconButton>
         </div>
       </div>
-      <p style={{ fontSize: "11px", color: isDark ? "rgba(212,168,67,0.2)" : "#ccc", textAlign: "center", margin: 0 }}>
-        Enter to send · Shift+Enter for new line · Hold 🎤 to speak
+
+      <p style={{ fontSize: "11px", color: t.textFaint, textAlign: "center", margin: 0 }}>
+        Enter to send · Shift + Enter for a new line · hold the mic to speak
       </p>
     </div>
+  );
+}
+
+function IconButton({ children, style, ...props }) {
+  return (
+    <button
+      {...props}
+      style={{
+        width: "34px",
+        height: "34px",
+        borderRadius: radius.md,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.15s",
+        opacity: props.disabled ? 0.45 : 1,
+        cursor: props.disabled ? "not-allowed" : "pointer",
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+    </svg>
+  );
+}
+function ArrowUpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
   );
 }
