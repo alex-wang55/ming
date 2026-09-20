@@ -11,6 +11,8 @@ import Sidebar from "@/components/Sidebar";
 import LearnTab from "@/components/LearnTab";
 import WordsTab from "@/components/WordsTab";
 import SettingsTab from "@/components/SettingsTab";
+import GoalSetup from "@/components/GoalSetup";
+import Checkpoint from "@/components/Checkpoint";
 
 const WELCOME = {
   role: "assistant",
@@ -29,6 +31,8 @@ const HEADINGS = {
 export default function Home() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [tab, setTab] = useState("learn");
   const [messages, setMessages] = useState([WELCOME]);
   const [conversationId, setConversationId] = useState(null);
@@ -39,6 +43,7 @@ export default function Home() {
   const [activity, setActivity] = useState([]);
   const [currentLesson, setCurrentLesson] = useState(null);
   const [theme, setTheme] = useState("light");
+  const [checkpointWords, setCheckpointWords] = useState(null);
   const bottomRef = useRef(null);
 
   const t = themes[theme];
@@ -71,6 +76,7 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
+      loadProfile();
       loadConversation();
       loadWordCount();
       loadProgress();
@@ -81,6 +87,16 @@ export default function Home() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  async function loadProfile() {
+    const { data } = await supabase
+      .from("profiles")
+      .select("goal_text, deadline_date")
+      .eq("id", user.id)
+      .single();
+    setProfile(data || { goal_text: null, deadline_date: null });
+    setProfileLoading(false);
+  }
 
   async function loadConversation() {
     const { data } = await supabase
@@ -112,6 +128,7 @@ export default function Home() {
     setCompletedLessons(data ? data.map((d) => d.lesson_id) : []);
   }
 
+  // Streak with a 1-day-per-week freeze so a single missed day doesn't reset it
   async function loadActivity() {
     const { data } = await supabase
       .from("daily_activity")
@@ -125,10 +142,22 @@ export default function Home() {
 
     const dates = new Set(rows.map((r) => r.date));
     let count = 0;
+    let freezeUsed = false;
+    let daysSinceFreeze = 0;
     const cursor = new Date();
     if (!dates.has(cursor.toISOString().slice(0, 10))) cursor.setDate(cursor.getDate() - 1);
-    while (dates.has(cursor.toISOString().slice(0, 10))) {
-      count++;
+
+    for (let i = 0; i < 400; i++) {
+      const key = cursor.toISOString().slice(0, 10);
+      if (dates.has(key)) {
+        count++;
+        daysSinceFreeze++;
+      } else if (!freezeUsed && daysSinceFreeze < 7) {
+        freezeUsed = true;
+        daysSinceFreeze = 0;
+      } else {
+        break;
+      }
       cursor.setDate(cursor.getDate() - 1);
     }
     setStreak(count);
@@ -179,7 +208,19 @@ export default function Home() {
       console.error("Error saving progress:", error);
       return;
     }
-    setCompletedLessons((prev) => [...new Set([...prev, lessonId])]);
+    const next = [...new Set([...completedLessons, lessonId])];
+    setCompletedLessons(next);
+
+    // Every 3rd completed lesson: pull up to 3 recent words for a quick checkpoint
+    if (next.length % 3 === 0) {
+      const { data } = await supabase
+        .from("words")
+        .select("chinese, pinyin, meaning")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      if (data && data.length) setCheckpointWords(data);
+    }
   }
 
   async function sendMessage(text) {
@@ -237,8 +278,16 @@ export default function Home() {
     setTab("learn");
   }
 
+  function handleGoalDone(newProfile) {
+    setProfile(newProfile);
+  }
+
   if (authLoading) return <LoadingScreen t={t} />;
   if (!user) return <Auth />;
+  if (profileLoading) return <LoadingScreen t={t} />;
+  if (profile && !profile.goal_text) {
+    return <GoalSetup user={user} theme={theme} onDone={handleGoalDone} />;
+  }
 
   const totalLessons = 18;
   const stats = { done: completedLessons.length, total: totalLessons, wordCount };
@@ -281,6 +330,8 @@ export default function Home() {
               streak={streak}
               activity={activity}
               theme={theme}
+              goalText={profile?.goal_text}
+              deadlineDate={profile?.deadline_date}
             />
           </div>
         )}
@@ -371,6 +422,14 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {checkpointWords && (
+        <Checkpoint
+          words={checkpointWords}
+          theme={theme}
+          onFinish={() => setCheckpointWords(null)}
+        />
+      )}
     </div>
   );
 }

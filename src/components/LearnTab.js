@@ -3,8 +3,7 @@ import { LESSONS } from "@/lib/lessons";
 import RightPanel from "@/components/RightPanel";
 import { themes, radius } from "@/lib/theme";
 
-export default function LearnTab({ completedLessons, onStartLesson, wordCount, streak, activity, theme }) {
-  const t = themes[theme];
+export default function LearnTab({ completedLessons, onStartLesson, wordCount, streak, activity, theme, goalText, deadlineDate }) {  const t = themes[theme];
   const total = LESSONS.reduce((s, w) => s + w.lessons.length, 0);
   const done = completedLessons.length;
 
@@ -107,6 +106,8 @@ export default function LearnTab({ completedLessons, onStartLesson, wordCount, s
         activity={activity}
         onStartLesson={onStartLesson}
         theme={theme}
+        goalText={goalText}
+        deadlineDate={deadlineDate}
       />
     </div>
   );
