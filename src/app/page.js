@@ -45,6 +45,7 @@ export default function Home() {
   const [theme, setTheme] = useState("light");
   const [checkpointWords, setCheckpointWords] = useState(null);
   const bottomRef = useRef(null);
+  const loadedUserId = useRef(null);
 
   const t = themes[theme];
 
@@ -75,7 +76,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    // Supabase re-emits a fresh session (and so a fresh user object) on token
+    // refresh, not just on sign-in. Only reload everything when the signed-in
+    // user actually changes, otherwise a routine refresh re-fetches the
+    // profile and can flicker the goal-setup screen if that fetch hiccups.
+    if (user && user.id !== loadedUserId.current) {
+      loadedUserId.current = user.id;
       loadProfile();
       loadConversation();
       loadWordCount();
@@ -89,11 +95,18 @@ export default function Home() {
   }, [messages, loading]);
 
   async function loadProfile() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("goal_text, deadline_date, onboarding_skipped")
       .eq("id", user.id)
       .single();
+    // PGRST116 = no row found, which legitimately means a brand-new profile.
+    // Any other error is transient (network blip, etc.) — don't let it wipe
+    // an already-loaded profile and kick the user back into goal setup.
+    if (error && error.code !== "PGRST116") {
+      setProfileLoading(false);
+      return;
+    }
     setProfile(data || { goal_text: null, deadline_date: null, onboarding_skipped: false });
     setProfileLoading(false);
   }
