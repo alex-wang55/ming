@@ -36,6 +36,7 @@ export default function Home() {
   const [wordCount, setWordCount] = useState(0);
   const [completedLessons, setCompletedLessons] = useState([]);
   const [streak, setStreak] = useState(0);
+  const [activity, setActivity] = useState([]);
   const [currentLesson, setCurrentLesson] = useState(null);
   const [theme, setTheme] = useState("light");
   const bottomRef = useRef(null);
@@ -73,6 +74,7 @@ export default function Home() {
       loadConversation();
       loadWordCount();
       loadProgress();
+      loadActivity();
     }
   }, [user]);
 
@@ -108,6 +110,44 @@ export default function Home() {
       .select("lesson_id")
       .eq("user_id", user.id);
     setCompletedLessons(data ? data.map((d) => d.lesson_id) : []);
+  }
+
+  async function loadActivity() {
+    const { data } = await supabase
+      .from("daily_activity")
+      .select("activity_date, session_count")
+      .eq("user_id", user.id)
+      .order("activity_date", { ascending: false })
+      .limit(90);
+
+    const rows = (data || []).map((d) => ({ date: d.activity_date, count: d.session_count }));
+    setActivity(rows);
+
+    const dates = new Set(rows.map((r) => r.date));
+    let count = 0;
+    const cursor = new Date();
+    if (!dates.has(cursor.toISOString().slice(0, 10))) cursor.setDate(cursor.getDate() - 1);
+    while (dates.has(cursor.toISOString().slice(0, 10))) {
+      count++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    setStreak(count);
+  }
+
+  async function recordActivity() {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("daily_activity")
+      .select("session_count")
+      .eq("user_id", user.id)
+      .eq("activity_date", today)
+      .single();
+
+    await supabase.from("daily_activity").upsert(
+      { user_id: user.id, activity_date: today, session_count: (data?.session_count || 0) + 1 },
+      { onConflict: "user_id,activity_date" }
+    );
+    loadActivity();
   }
 
   async function saveConversation(updated) {
@@ -161,6 +201,7 @@ export default function Home() {
       if (user) {
         await saveConversation(final);
         loadWordCount();
+        recordActivity();
       }
     } catch (err) {
       console.error(err);
@@ -202,8 +243,7 @@ export default function Home() {
   const totalLessons = 18;
   const stats = { done: completedLessons.length, total: totalLessons, wordCount };
   const [headTitle, headSubFn] = HEADINGS[tab];
-  const headSub =
-    tab === "chat" && currentLesson ? currentLesson.sub : headSubFn(stats);
+  const headSub = tab === "chat" && currentLesson ? currentLesson.sub : headSubFn(stats);
   const title = tab === "chat" && currentLesson ? currentLesson.title : headTitle;
 
   return (
@@ -239,6 +279,7 @@ export default function Home() {
               onStartLesson={handleStartLesson}
               wordCount={wordCount}
               streak={streak}
+              activity={activity}
               theme={theme}
             />
           </div>

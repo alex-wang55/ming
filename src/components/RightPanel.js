@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { LESSONS } from "@/lib/lessons";
 import { themes, font, radius } from "@/lib/theme";
+import StreakCalendar from "@/components/StreakCalendar";
 
 const WORDS = [
   { chinese: "谢谢", pinyin: "xiè xie", meaning: "Thank you" },
@@ -13,13 +14,11 @@ const WORDS = [
   { chinese: "朋友", pinyin: "péng yǒu", meaning: "Friend" },
 ];
 
-export default function RightPanel({ completedLessons, wordCount, streak, onStartLesson, theme }) {
+export default function RightPanel({ completedLessons, wordCount, streak, activity, onStartLesson, theme }) {
   const t = themes[theme];
   const [playing, setPlaying] = useState(false);
 
   const word = WORDS[new Date().getDay() % WORDS.length];
-  const days = ["M", "T", "W", "T", "F", "S", "S"];
-  const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
 
   const next = LESSONS.flatMap((w) => w.lessons).find((l) => !completedLessons.includes(l.id));
   const w1 = LESSONS[0].lessons;
@@ -127,48 +126,7 @@ export default function RightPanel({ completedLessons, wordCount, streak, onStar
         </div>
       </div>
 
-      <Card t={t}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "9px" }}>
-          <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.textMuted }}>
-            Streak
-          </span>
-          <span style={{ fontSize: "15px", fontWeight: 700, color: t.warning }}>{streak}</span>
-        </div>
-        <div style={{ display: "flex", gap: "3px", marginBottom: "7px" }}>
-          {days.map((d, i) => {
-            const hit = i < streak && i <= todayIdx;
-            return (
-              <div
-                key={i}
-                style={{
-                  flex: 1,
-                  height: "20px",
-                  borderRadius: radius.sm,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "9px",
-                  fontWeight: 600,
-                  background: hit ? t.successSoft : "transparent",
-                  border: `1px solid ${hit ? t.successBorder : t.border}`,
-                  color: hit ? t.success : t.textFaint,
-                }}
-              >
-                {d}
-              </div>
-            );
-          })}
-        </div>
-        <p style={{ fontSize: "10.5px", color: t.textMuted, margin: 0 }}>
-          {streak === 0
-            ? "Practice today to start one"
-            : streak < 3
-            ? "Keep it going"
-            : streak < 7
-            ? "Nice run"
-            : "Strong streak"}
-        </p>
-      </Card>
+      <StreakCalendar activity={activity} streak={streak} theme={theme} weeks={5} />
 
       <Card t={t}>
         <div style={{ display: "flex", alignItems: "center", gap: "11px" }}>

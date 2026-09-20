@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { themes, font, radius } from "@/lib/theme";
+import { ToneGraph } from "@/components/ToneContour";
 
 export default function Message({ message, theme }) {
   const t = themes[theme];
@@ -31,9 +32,7 @@ export default function Message({ message, theme }) {
             marginTop: "2px",
           }}
         >
-          <span style={{ fontFamily: font.cn, fontSize: "12px", color: t.accent, fontWeight: 700 }}>
-            明
-          </span>
+          <span style={{ fontFamily: font.cn, fontSize: "12px", color: t.accent, fontWeight: 700 }}>明</span>
         </div>
       )}
 
@@ -56,13 +55,42 @@ export default function Message({ message, theme }) {
 }
 
 function Content({ content, t }) {
-  const parts = content.split(/([\u4e00-\u9fff\u3400-\u4dbf]+)/g);
+  const toneMatches = [...content.matchAll(/\[TONE:([^|]+)\|([^|]+)\|(\d)\|([^\]]+)\]/g)];
+  const cleanText = content.replace(/\[TONE:[^\]]+\]/g, "").trim();
+  const parts = cleanText.split(/([\u4e00-\u9fff\u3400-\u4dbf]+)/g);
+
   return (
-    <p style={{ fontSize: "14.5px", lineHeight: 1.65, color: t.text, margin: 0, whiteSpace: "pre-wrap" }}>
-      {parts.map((part, i) =>
-        /[\u4e00-\u9fff]/.test(part) ? <Hanzi key={i} text={part} t={t} /> : part
+    <div>
+      <p style={{ fontSize: "14.5px", lineHeight: 1.65, color: t.text, margin: 0, whiteSpace: "pre-wrap" }}>
+        {parts.map((part, i) =>
+          /[\u4e00-\u9fff]/.test(part) ? <Hanzi key={i} text={part} t={t} /> : part
+        )}
+      </p>
+
+      {toneMatches.length > 0 && (
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
+          {toneMatches.map(([, hanzi, pinyin, tone, meaning], i) => (
+            <div
+              key={i}
+              style={{
+                background: t.bg,
+                border: `1px solid ${t.border}`,
+                borderRadius: "8px",
+                padding: "8px 10px",
+                minWidth: "90px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "baseline", gap: "5px", marginBottom: "5px" }}>
+                <span style={{ fontFamily: font.cn, fontSize: "15px", color: t.accent }}>{hanzi}</span>
+                <span style={{ fontSize: "10px", color: t.textSecondary, fontStyle: "italic" }}>{pinyin}</span>
+              </div>
+              <ToneGraph tone={parseInt(tone)} color={t.accent} height={16} />
+              <p style={{ fontSize: "9.5px", color: t.textMuted, margin: "4px 0 0" }}>{meaning}</p>
+            </div>
+          ))}
+        </div>
       )}
-    </p>
+    </div>
   );
 }
 
