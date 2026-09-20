@@ -14,8 +14,7 @@ const WORDS = [
   { chinese: "朋友", pinyin: "péng yǒu", meaning: "Friend" },
 ];
 
-export default function RightPanel({ completedLessons, wordCount, streak, activity, onStartLesson, theme }) {
-  const t = themes[theme];
+export default function RightPanel({ completedLessons, wordCount, streak, activity, onStartLesson, theme, goalText, deadlineDate }) {  const t = themes[theme];
   const [playing, setPlaying] = useState(false);
 
   const word = WORDS[new Date().getDay() % WORDS.length];
@@ -125,6 +124,21 @@ export default function RightPanel({ completedLessons, wordCount, streak, activi
           {word.chinese[0]}
         </div>
       </div>
+
+      {deadlineDate && (() => {
+        const days = Math.ceil((new Date(deadlineDate) - new Date()) / 86400000);
+        return (
+          <Card t={t}>
+            <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.textMuted, margin: "0 0 6px" }}>
+              {days > 0 ? "Days remaining" : "Deadline passed"}
+            </p>
+            <p style={{ fontSize: "22px", fontWeight: 700, color: days <= 3 ? t.danger : t.accent, margin: "0 0 4px" }}>
+              {Math.max(days, 0)}
+            </p>
+            {goalText && <p style={{ fontSize: "11px", color: t.textSecondary, margin: 0, lineHeight: 1.5 }}>{goalText}</p>}
+          </Card>
+        );
+      })()}
 
       <StreakCalendar activity={activity} streak={streak} theme={theme} weeks={5} />
 
