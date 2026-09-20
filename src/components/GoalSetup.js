@@ -24,8 +24,12 @@ export default function GoalSetup({ user, theme, onDone }) {
     onDone({ goal_text: goal.trim(), deadline_date: hasDeadline && date ? date : null });
   }
 
-  function skip() {
-    onDone({ goal_text: null, deadline_date: null });
+  async function skip() {
+    await supabase
+      .from("profiles")
+      .update({ onboarding_skipped: true })
+      .eq("id", user.id);
+    onDone({ goal_text: null, deadline_date: null, onboarding_skipped: true });
   }
 
   return (

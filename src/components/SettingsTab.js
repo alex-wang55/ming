@@ -3,13 +3,26 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { themes, radius } from "@/lib/theme";
 
-export default function SettingsTab({ user, theme, setTheme }) {
+export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGoal }) {
   const t = themes[theme];
   const [autoplay, setAutoplay] = useState(true);
   const [reminders, setReminders] = useState(true);
   const [pinyin, setPinyin] = useState("always");
   const [pace, setPace] = useState("adaptive");
   const [saved, setSaved] = useState(false);
+  const [goal, setGoal] = useState(profile?.goal_text || "");
+  const [deadline, setDeadline] = useState(profile?.deadline_date || "");
+  const [goalSaved, setGoalSaved] = useState(false);
+
+  async function saveGoal() {
+    await supabase
+      .from("profiles")
+      .update({ goal_text: goal.trim() || null, deadline_date: deadline || null })
+      .eq("id", user.id);
+    onUpdateGoal({ goal_text: goal.trim() || null, deadline_date: deadline || null });
+    setGoalSaved(true);
+    setTimeout(() => setGoalSaved(false), 1800);
+  }
 
   useEffect(() => {
     const raw = localStorage.getItem("ming-settings");
@@ -56,6 +69,60 @@ export default function SettingsTab({ user, theme, setTheme }) {
               ]}
             />
           </Row>
+        </Group>
+
+        <Group label="Your goal" t={t}>
+          <div style={{ padding: "12px 0 14px" }}>
+            <textarea
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="What are you learning Mandarin for?"
+              rows={2}
+              style={{
+                width: "100%",
+                background: t.bg,
+                border: `1px solid ${t.border}`,
+                borderRadius: radius.md,
+                padding: "10px 12px",
+                fontSize: "13px",
+                color: t.text,
+                resize: "none",
+                outline: "none",
+                marginBottom: "8px",
+                boxSizing: "border-box",
+              }}
+            />
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              style={{
+                background: t.bg,
+                border: `1px solid ${t.border}`,
+                borderRadius: radius.md,
+                padding: "8px 10px",
+                fontSize: "13px",
+                color: t.text,
+                outline: "none",
+                marginBottom: "10px",
+              }}
+            />
+            <button
+              onClick={saveGoal}
+              style={{
+                width: "100%",
+                padding: "9px",
+                borderRadius: radius.md,
+                background: goalSaved ? t.successSoft : t.accentSoft,
+                border: `1px solid ${goalSaved ? t.successBorder : t.accentBorder}`,
+                color: goalSaved ? t.success : t.accent,
+                fontSize: "12.5px",
+                fontWeight: 600,
+              }}
+            >
+              {goalSaved ? "Saved" : "Update goal"}
+            </button>
+          </div>
         </Group>
 
         <Group label="Learning" t={t}>

@@ -91,10 +91,10 @@ export default function Home() {
   async function loadProfile() {
     const { data } = await supabase
       .from("profiles")
-      .select("goal_text, deadline_date")
+      .select("goal_text, deadline_date, onboarding_skipped")
       .eq("id", user.id)
       .single();
-    setProfile(data || { goal_text: null, deadline_date: null });
+    setProfile(data || { goal_text: null, deadline_date: null, onboarding_skipped: false });
     setProfileLoading(false);
   }
 
@@ -236,7 +236,10 @@ export default function Home() {
         body: JSON.stringify({ messages: updated.slice(1), userId: user?.id }),
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        setMessages([...updated, { role: "assistant", content: data.error }]);
+        return;
+      }
       const final = [...updated, { role: "assistant", content: data.reply }];
       setMessages(final);
       if (user) {
@@ -285,7 +288,8 @@ export default function Home() {
   if (authLoading) return <LoadingScreen t={t} />;
   if (!user) return <Auth />;
   if (profileLoading) return <LoadingScreen t={t} />;
-  if (profile && !profile.goal_text) {
+  if (profile === null) return <LoadingScreen t={t} />; // profile hasn't loaded yet, never show GoalSetup on a null
+  if (!profile.goal_text && !profile.onboarding_skipped) {
     return <GoalSetup user={user} theme={theme} onDone={handleGoalDone} />;
   }
 
@@ -418,7 +422,13 @@ export default function Home() {
 
         {tab === "settings" && (
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <SettingsTab user={user} theme={theme} setTheme={setTheme} />
+            <SettingsTab
+              user={user}
+              theme={theme}
+              setTheme={setTheme}
+              profile={profile}
+              onUpdateGoal={(newProfile) => setProfile(newProfile)}
+            />
           </div>
         )}
       </div>
