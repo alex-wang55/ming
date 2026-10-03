@@ -1,5 +1,6 @@
 "use client";
 import { themes, radius } from "@/lib/theme";
+import { localDateKey } from "@/lib/dates";
 
 // activity: array of { date: "YYYY-MM-DD", count: number }
 export default function StreakCalendar({ activity = [], streak = 0, theme, weeks = 5 }) {
@@ -16,7 +17,7 @@ export default function StreakCalendar({ activity = [], streak = 0, theme, weeks
   const cells = Array.from({ length: totalDays }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     return { key, count: byDate[key] || 0, future: d > today };
   });
 

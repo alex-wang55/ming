@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { LESSONS } from "@/lib/lessons";
 import { themes, font, radius } from "@/lib/theme";
 
-export default function CommandPalette({ open, onClose, theme, words = [], onSelectLesson, onSelectTab }) {
+export default function CommandPalette({ open, onClose, theme, words = [], onSelectLesson, onSelectTab, isMobile = false }) {
   const t = themes[theme];
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -99,6 +99,9 @@ export default function CommandPalette({ open, onClose, theme, words = [], onSel
   return (
     <div
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search"
       style={{
         position: "fixed",
         inset: 0,
@@ -108,7 +111,7 @@ export default function CommandPalette({ open, onClose, theme, words = [], onSel
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        paddingTop: "14vh",
+        paddingTop: isMobile ? "calc(env(safe-area-inset-top) + 12px)" : "14vh",
       }}
     >
       <div
@@ -137,6 +140,8 @@ export default function CommandPalette({ open, onClose, theme, words = [], onSel
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search lessons, words, or pages"
+            aria-label="Search lessons, words, or pages"
+            enterKeyHint="go"
             style={{
               flex: 1,
               background: "transparent",
@@ -216,7 +221,14 @@ export default function CommandPalette({ open, onClose, theme, words = [], onSel
           ))}
         </div>
 
-        <div style={{ padding: "8px 14px", borderTop: `1px solid ${t.border}`, display: "flex", gap: "13px" }}>
+        <div
+          style={{
+            padding: "8px 14px",
+            borderTop: `1px solid ${t.border}`,
+            display: isMobile ? "none" : "flex",
+            gap: "13px",
+          }}
+        >
           {[
             ["enter", "open"],
             ["up down", "navigate"],

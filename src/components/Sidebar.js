@@ -7,8 +7,79 @@ const NAV = [
   { id: "map", label: "Map", icon: MapIcon },
   { id: "words", label: "Words", icon: BookIcon },
 ];
+const SETTINGS = { id: "settings", label: "Settings", icon: GearIcon };
 
-export default function Sidebar({ tab, setTab, theme }) {
+// Phone layout: tab bar along the bottom, clear of the home indicator.
+export function BottomNav({ tab, setTab, theme, dueCount = 0 }) {
+  const t = themes[theme];
+  return (
+    <nav
+      style={{
+        display: "flex",
+        flexShrink: 0,
+        borderTop: `1px solid ${t.border}`,
+        background: t.bg,
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {[...NAV, SETTINGS].map((item) => {
+        const Icon = item.icon;
+        const active = tab === item.id;
+        return (
+          <button
+            key={item.id}
+            onClick={() => setTab(item.id)}
+            aria-current={active ? "page" : undefined}
+            style={{
+              flex: 1,
+              height: "56px",
+              border: "none",
+              background: "transparent",
+              color: active ? t.accent : t.textMuted,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "3px",
+              position: "relative",
+            }}
+          >
+            <Icon />
+            <span style={{ fontSize: "10.5px", fontWeight: active ? 600 : 500 }}>{item.label}</span>
+            {item.id === "words" && dueCount > 0 && <Badge t={t}>{dueCount}</Badge>}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function Badge({ children, t }) {
+  return (
+    <span
+      style={{
+        position: "absolute",
+        top: "6px",
+        left: "calc(50% + 6px)",
+        minWidth: "16px",
+        height: "16px",
+        padding: "0 4px",
+        borderRadius: radius.full,
+        background: t.accent,
+        color: t.btnText,
+        fontSize: "9.5px",
+        fontWeight: 700,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children > 99 ? "99+" : children}
+    </span>
+  );
+}
+
+export default function Sidebar({ tab, setTab, theme, dueCount = 0 }) {
   const t = themes[theme];
 
   return (
@@ -49,6 +120,7 @@ export default function Sidebar({ tab, setTab, theme }) {
             item={item}
             active={tab === item.id}
             onClick={() => setTab(item.id)}
+            badge={item.id === "words" ? dueCount : 0}
             t={t}
           />
         ))}
@@ -56,22 +128,19 @@ export default function Sidebar({ tab, setTab, theme }) {
 
       <div style={{ flex: 1 }} />
 
-      <NavButton
-        item={{ id: "settings", label: "Settings", icon: GearIcon }}
-        active={tab === "settings"}
-        onClick={() => setTab("settings")}
-        t={t}
-      />
+      <NavButton item={SETTINGS} active={tab === "settings"} onClick={() => setTab("settings")} t={t} />
     </nav>
   );
 }
 
-function NavButton({ item, active, onClick, t }) {
+function NavButton({ item, active, onClick, badge = 0, t }) {
   const Icon = item.icon;
   return (
     <button
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       style={{
+        position: "relative",
         width: "60px",
         height: "56px",
         borderRadius: radius.md,
@@ -88,6 +157,7 @@ function NavButton({ item, active, onClick, t }) {
     >
       <Icon />
       <span style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.01em" }}>{item.label}</span>
+      {badge > 0 && <Badge t={t}>{badge}</Badge>}
     </button>
   );
 }

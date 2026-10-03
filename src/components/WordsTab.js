@@ -1,46 +1,13 @@
 "use client";
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { useState } from "react";
 import { themes, font, radius } from "@/lib/theme";
+import { useSpeaker } from "@/lib/audio";
+import { isDue, describeNextReview } from "@/lib/review";
 
-export default function WordsTab({ userId, theme }) {
+export default function WordsTab({ words, loading, onReview, theme, isMobile }) {
   const t = themes[theme];
-  const [words, setWords] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
-  const [playingId, setPlayingId] = useState(null);
-
-  useEffect(() => {
-    supabase
-      .from("words")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        setWords(data || []);
-        setLoading(false);
-      });
-  }, [userId]);
-
-  async function speak(word) {
-    if (playingId) return;
-    setPlayingId(word.id);
-    try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: word.chinese }),
-      });
-      const data = await res.json();
-      if (data.audio) {
-        const a = new Audio(`data:audio/mp3;base64,${data.audio}`);
-        a.onended = () => setPlayingId(null);
-        a.play();
-      } else setPlayingId(null);
-    } catch {
-      setPlayingId(null);
-    }
-  }
+  const [playing, play] = useSpeaker();
 
   if (loading)
     return (
@@ -52,84 +19,108 @@ export default function WordsTab({ userId, theme }) {
   if (!words.length)
     return (
       <Centered t={t}>
-        <p style={{ fontFamily: font.cn, fontSize: "40px", color: t.accent, opacity: 0.2, margin: "0 0 14px" }}>
-          字
-        </p>
+        <p style={{ fontFamily: font.cn, fontSize: "40px", color: t.accent, opacity: 0.2, margin: "0 0 14px" }}>字</p>
         <p style={{ fontSize: "15px", fontWeight: 600, color: t.text, margin: "0 0 6px" }}>No words yet</p>
         <p style={{ fontSize: "13px", color: t.textMuted, maxWidth: "260px", lineHeight: 1.6, margin: 0 }}>
-          Words Ming teaches you get saved here automatically, with review timing built in.
+          New words Ming teaches you in chat are saved here automatically, with review timing built in.
         </p>
       </Centered>
     );
 
-  const now = new Date();
-  const due = words.filter((w) => new Date(w.next_review) <= now);
+  const due = words.filter((w) => isDue(w));
   const shown = filter === "due" ? due : words;
 
   return (
-    <div style={{ height: "100%", overflowY: "auto", padding: "22px 26px", background: t.bg }}>
-      <div style={{ display: "flex", gap: "6px", marginBottom: "18px" }}>
+    <div style={{ height: "100%", overflowY: "auto", padding: isMobile ? "16px 14px 24px" : "22px 26px", background: t.bg }}>
+      <div style={{ display: "flex", gap: "6px", marginBottom: "18px", alignItems: "center", flexWrap: "wrap" }}>
         <FilterTab active={filter === "all"} onClick={() => setFilter("all")} t={t}>
           All {words.length}
         </FilterTab>
         <FilterTab active={filter === "due"} onClick={() => setFilter("due")} t={t}>
           Due {due.length}
         </FilterTab>
+        <div style={{ flex: 1 }} />
+        {due.length > 0 && (
+          <button
+            onClick={onReview}
+            style={{
+              padding: "7px 16px",
+              borderRadius: radius.full,
+              background: t.accent,
+              border: "none",
+              color: t.btnText,
+              fontSize: "12.5px",
+              fontWeight: 600,
+            }}
+          >
+            Review {due.length} word{due.length === 1 ? "" : "s"}
+          </button>
+        )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))", gap: "10px" }}>
-        {shown.map((w) => {
-          const isDue = new Date(w.next_review) <= now;
-          const isPlaying = playingId === w.id;
-          return (
-            <button
-              key={w.id}
-              onClick={() => speak(w)}
-              style={{
-                textAlign: "left",
-                background: isDue ? t.accentSoft : t.surface,
-                border: `1px solid ${isDue ? t.accentBorder : t.border}`,
-                borderRadius: radius.md,
-                padding: "14px",
-                boxShadow: t.shadow,
-                opacity: isPlaying ? 0.6 : 1,
-                transition: "all 0.15s",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "5px" }}>
-                <span style={{ fontFamily: font.cn, fontSize: "24px", fontWeight: 500, color: t.accent, lineHeight: 1.1 }}>
-                  {w.chinese}
-                </span>
-                <SpeakerIcon color={t.textMuted} />
-              </div>
-              <p style={{ fontSize: "11.5px", fontStyle: "italic", color: t.textSecondary, margin: "0 0 3px" }}>
-                {w.pinyin}
-              </p>
-              <p style={{ fontSize: "13px", color: t.text, margin: "0 0 9px" }}>{w.meaning}</p>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "10px", color: t.textFaint }}>Seen {w.times_seen}x</span>
-                {isDue && (
+      {filter === "due" && !due.length ? (
+        <p style={{ fontSize: "13px", color: t.textMuted, textAlign: "center", padding: "40px 0" }}>
+          Nothing due right now. Nice work.
+        </p>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 140 : 168}px, 1fr))`,
+            gap: "10px",
+          }}
+        >
+          {shown.map((w) => {
+            const wordDue = isDue(w);
+            return (
+              <button
+                key={w.id}
+                onClick={() => play(w.chinese)}
+                title="Play pronunciation"
+                style={{
+                  textAlign: "left",
+                  background: wordDue ? t.accentSoft : t.surface,
+                  border: `1px solid ${wordDue ? t.accentBorder : t.border}`,
+                  borderRadius: radius.md,
+                  padding: "14px",
+                  boxShadow: t.shadow,
+                  opacity: playing === w.chinese ? 0.6 : 1,
+                  transition: "all 0.15s",
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "6px", marginBottom: "5px" }}>
                   <span
                     style={{
-                      fontSize: "9px",
-                      fontWeight: 700,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
+                      fontFamily: font.cn,
+                      fontSize: "24px",
+                      fontWeight: 500,
                       color: t.accent,
-                      background: "transparent",
-                      border: `1px solid ${t.accentBorder}`,
-                      borderRadius: radius.full,
-                      padding: "2px 7px",
+                      lineHeight: 1.1,
+                      overflowWrap: "anywhere",
                     }}
                   >
-                    Review
+                    {w.chinese}
                   </span>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+                  <SpeakerIcon color={t.textMuted} />
+                </div>
+                <p style={{ fontSize: "11.5px", fontStyle: "italic", color: t.textSecondary, margin: "0 0 3px" }}>{w.pinyin}</p>
+                <p style={{ fontSize: "13px", color: t.text, margin: "0 0 9px" }}>{w.meaning}</p>
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: wordDue ? 700 : 400,
+                    color: wordDue ? t.accent : t.textFaint,
+                    letterSpacing: wordDue ? "0.04em" : 0,
+                  }}
+                >
+                  {describeNextReview(w)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -138,6 +129,7 @@ function FilterTab({ children, active, onClick, t }) {
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       style={{
         padding: "6px 14px",
         borderRadius: radius.full,

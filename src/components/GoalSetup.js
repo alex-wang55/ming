@@ -9,33 +9,38 @@ export default function GoalSetup({ user, theme, onDone }) {
   const [hasDeadline, setHasDeadline] = useState(false);
   const [date, setDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  async function save() {
-    if (!goal.trim()) return;
+  async function persist(patch) {
     setSaving(true);
-    await supabase
-      .from("profiles")
-      .update({
-        goal_text: goal.trim(),
-        deadline_date: hasDeadline && date ? date : null,
-      })
-      .eq("id", user.id);
+    setError(null);
+    const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("id");
     setSaving(false);
-    onDone({ goal_text: goal.trim(), deadline_date: hasDeadline && date ? date : null });
+    if (error) {
+      console.error("Profile save failed:", error);
+      setError("Couldn't save that. Check your connection and try again.");
+      return;
+    }
+    // No rows back means the database refused the update (missing RLS policy, see
+    // supabase/migrations). Let the user in anyway rather than trapping them here.
+    if (!data?.length) console.warn("Profile update affected no rows");
+    onDone(patch);
   }
 
-  async function skip() {
-    await supabase
-      .from("profiles")
-      .update({ onboarding_skipped: true })
-      .eq("id", user.id);
-    onDone({ goal_text: null, deadline_date: null, onboarding_skipped: true });
+  function save() {
+    if (!goal.trim()) return;
+    persist({ goal_text: goal.trim(), deadline_date: hasDeadline && date ? date : null });
+  }
+
+  function skip() {
+    persist({ onboarding_skipped: true });
   }
 
   return (
     <div
+      className="app-root"
       style={{
-        minHeight: "100vh",
+        overflowY: "auto",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -68,6 +73,8 @@ export default function GoalSetup({ user, theme, onDone }) {
 
         <textarea
           value={goal}
+          maxLength={300}
+          aria-label="Your Mandarin goal"
           onChange={(e) => setGoal(e.target.value)}
           placeholder="e.g. Traveling to Beijing in 3 weeks, or talking with my partner's family"
           rows={3}
@@ -105,6 +112,12 @@ export default function GoalSetup({ user, theme, onDone }) {
           />
         )}
 
+        {error && (
+          <p role="alert" style={{ fontSize: "12.5px", color: t.danger, margin: 0 }}>
+            {error}
+          </p>
+        )}
+
         <button
           onClick={save}
           disabled={!goal.trim() || saving}
@@ -124,6 +137,7 @@ export default function GoalSetup({ user, theme, onDone }) {
 
         <button
           onClick={skip}
+          disabled={saving}
           style={{
             background: "none",
             border: "none",

@@ -20,7 +20,20 @@ export function ToneGraph({ tone, color, height = 26 }) {
   );
 }
 
-export function ToneCard({ hanzi, pinyin, tone, meaning, theme, onPlay }) {
+// One contour per syllable, e.g. tones [4, 5] for 谢谢.
+export function ToneGraphs({ tones, color, height = 16 }) {
+  return (
+    <div style={{ display: "flex", gap: "4px" }}>
+      {tones.map((tone, i) => (
+        <div key={i} style={{ flex: 1, minWidth: 0 }}>
+          <ToneGraph tone={tone} color={color} height={height} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ToneCard({ hanzi, pinyin, tone, meaning, theme, onPlay, playing }) {
   const t = themes[theme];
   const c = CONTOURS[tone] || CONTOURS[5];
 
@@ -36,7 +49,8 @@ export function ToneCard({ hanzi, pinyin, tone, meaning, theme, onPlay }) {
         borderRadius: radius.md,
         padding: "12px 14px",
         cursor: onPlay ? "pointer" : "default",
-        transition: "border-color 0.15s",
+        opacity: playing ? 0.6 : 1,
+        transition: "border-color 0.15s, opacity 0.15s",
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: "7px", marginBottom: "8px" }}>
@@ -51,7 +65,7 @@ export function ToneCard({ hanzi, pinyin, tone, meaning, theme, onPlay }) {
   );
 }
 
-export default function ToneReference({ theme, onPlay }) {
+export default function ToneReference({ theme, onPlay, playing }) {
   const t = themes[theme];
   const set = [
     { hanzi: "妈", pinyin: "mā", tone: 1, meaning: "mother" },
@@ -74,13 +88,20 @@ export default function ToneReference({ theme, onPlay }) {
       >
         The four tones
       </p>
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(118px, 1fr))", gap: "10px" }}>
         {set.map((s) => (
-          <ToneCard key={s.hanzi} {...s} theme={theme} onPlay={onPlay ? () => onPlay(s.hanzi) : null} />
+          <ToneCard
+            key={s.hanzi}
+            {...s}
+            theme={theme}
+            playing={playing === s.hanzi}
+            onPlay={onPlay ? () => onPlay(s.hanzi) : null}
+          />
         ))}
       </div>
       <p style={{ fontSize: "11.5px", color: t.textMuted, margin: "10px 0 0", lineHeight: 1.55 }}>
         Same syllable, four meanings. This is why tone accuracy matters more in Mandarin than in most languages.
+        {onPlay && " Tap a card to hear it."}
       </p>
     </div>
   );

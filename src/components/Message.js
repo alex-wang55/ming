@@ -1,11 +1,17 @@
 "use client";
-import { useState } from "react";
+import { Fragment } from "react";
 import { themes, font, radius } from "@/lib/theme";
-import { ToneGraph } from "@/components/ToneContour";
+import { ToneGraphs } from "@/components/ToneContour";
+import { parseToneTags, stripTags } from "@/lib/tags";
+import { useSpeaker } from "@/lib/audio";
+
+const HANZI_RUN = /([一-鿿㐀-䶿]+)/g;
+const HAS_HANZI = /[一-鿿㐀-䶿]/;
 
 export default function Message({ message, theme }) {
   const t = themes[theme];
   const isAI = message.role === "assistant";
+  const [playing, play] = useSpeaker();
 
   return (
     <div
@@ -38,55 +44,86 @@ export default function Message({ message, theme }) {
 
       <div
         style={{
-          background: isAI ? t.surface : t.accentSoft,
-          border: `1px solid ${isAI ? t.border : t.accentBorder}`,
+          background: message.error ? "transparent" : isAI ? t.surface : t.accentSoft,
+          border: `1px ${message.error ? "dashed" : "solid"} ${isAI ? t.border : t.accentBorder}`,
           borderRadius: isAI
             ? `${radius.lg} ${radius.lg} ${radius.lg} 4px`
             : `${radius.lg} ${radius.lg} 4px ${radius.lg}`,
           padding: "11px 15px",
-          maxWidth: "76%",
-          boxShadow: t.shadow,
+          maxWidth: "min(85%, 600px)",
+          minWidth: 0,
+          boxShadow: message.error ? "none" : t.shadow,
         }}
       >
-        <Content content={message.content} t={t} />
+        <Content content={message.content} t={t} playing={playing} play={play} muted={message.error} />
       </div>
     </div>
   );
 }
 
-function Content({ content, t }) {
-  const toneMatches = [...content.matchAll(/\[TONE:([^|]+)\|([^|]+)\|(\d)\|([^\]]+)\]/g)];
-  const cleanText = content.replace(/\[TONE:[^\]]+\]/g, "").trim();
-  const parts = cleanText.split(/([\u4e00-\u9fff\u3400-\u4dbf]+)/g);
+function Content({ content, t, playing, play, muted }) {
+  const tags = parseToneTags(content);
+  const text = stripTags(content)
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
 
   return (
     <div>
-      <p style={{ fontSize: "14.5px", lineHeight: 1.65, color: t.text, margin: 0, whiteSpace: "pre-wrap" }}>
-        {parts.map((part, i) =>
-          /[\u4e00-\u9fff]/.test(part) ? <Hanzi key={i} text={part} t={t} /> : part
-        )}
+      <p
+        style={{
+          fontSize: "14.5px",
+          lineHeight: 1.65,
+          color: muted ? t.textSecondary : t.text,
+          margin: 0,
+          whiteSpace: "pre-wrap",
+          overflowWrap: "anywhere",
+        }}
+      >
+        {text.split(/(\*\*[^*\n]+\*\*)/g).map((segment, i) => {
+          const bold = segment.length > 4 && segment.startsWith("**") && segment.endsWith("**");
+          const inner = bold ? segment.slice(2, -2) : segment;
+          const nodes = inner.split(HANZI_RUN).map((part, j) =>
+            HAS_HANZI.test(part) ? (
+              <Hanzi key={j} text={part} t={t} playing={playing === part} onPlay={() => play(part)} />
+            ) : (
+              part
+            )
+          );
+          return bold ? (
+            <strong key={i} style={{ fontWeight: 600 }}>
+              {nodes}
+            </strong>
+          ) : (
+            <Fragment key={i}>{nodes}</Fragment>
+          );
+        })}
       </p>
 
-      {toneMatches.length > 0 && (
+      {tags.length > 0 && (
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
-          {toneMatches.map(([, hanzi, pinyin, tone, meaning], i) => (
-            <div
+          {tags.map((tag, i) => (
+            <button
               key={i}
+              onClick={() => play(tag.hanzi)}
+              title={`Play ${tag.hanzi}`}
               style={{
+                textAlign: "left",
                 background: t.bg,
                 border: `1px solid ${t.border}`,
                 borderRadius: "8px",
                 padding: "8px 10px",
                 minWidth: "90px",
+                opacity: playing === tag.hanzi ? 0.6 : 1,
               }}
             >
               <div style={{ display: "flex", alignItems: "baseline", gap: "5px", marginBottom: "5px" }}>
-                <span style={{ fontFamily: font.cn, fontSize: "15px", color: t.accent }}>{hanzi}</span>
-                <span style={{ fontSize: "10px", color: t.textSecondary, fontStyle: "italic" }}>{pinyin}</span>
+                <span style={{ fontFamily: font.cn, fontSize: "15px", color: t.accent }}>{tag.hanzi}</span>
+                <span style={{ fontSize: "10px", color: t.textSecondary, fontStyle: "italic" }}>{tag.pinyin}</span>
               </div>
-              <ToneGraph tone={parseInt(tone)} color={t.accent} height={16} />
-              <p style={{ fontSize: "9.5px", color: t.textMuted, margin: "4px 0 0" }}>{meaning}</p>
-            </div>
+              <ToneGraphs tones={tag.tones} color={t.accent} height={16} />
+              <p style={{ fontSize: "9.5px", color: t.textMuted, margin: "4px 0 0" }}>{tag.meaning}</p>
+            </button>
           ))}
         </div>
       )}
@@ -94,32 +131,10 @@ function Content({ content, t }) {
   );
 }
 
-function Hanzi({ text, t }) {
-  const [playing, setPlaying] = useState(false);
-
-  async function speak() {
-    if (playing) return;
-    setPlaying(true);
-    try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
-      if (data.audio) {
-        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-        audio.onended = () => setPlaying(false);
-        audio.play();
-      } else setPlaying(false);
-    } catch {
-      setPlaying(false);
-    }
-  }
-
+function Hanzi({ text, t, playing, onPlay }) {
   return (
     <button
-      onClick={speak}
+      onClick={onPlay}
       title="Play pronunciation"
       style={{
         display: "inline-flex",

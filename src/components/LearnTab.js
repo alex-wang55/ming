@@ -1,11 +1,53 @@
 "use client";
 import { LESSONS } from "@/lib/lessons";
 import RightPanel from "@/components/RightPanel";
+import ProgressStrip from "@/components/ProgressStrip";
+import ToneReference from "@/components/ToneContour";
 import { themes, radius } from "@/lib/theme";
+import { useSpeaker } from "@/lib/audio";
 
-export default function LearnTab({ completedLessons, onStartLesson, wordCount, streak, activity, theme, goalText, deadlineDate }) {  const t = themes[theme];
-  const total = LESSONS.reduce((s, w) => s + w.lessons.length, 0);
-  const done = completedLessons.length;
+export default function LearnTab({
+  completedLessons,
+  onStartLesson,
+  wordCount,
+  dueCount,
+  onReview,
+  streak,
+  activity,
+  theme,
+  goalText,
+  deadlineDate,
+  isMobile,
+}) {
+  const t = themes[theme];
+  const [playing, play] = useSpeaker();
+  // Beginners see the tone guide first; once the tones lesson is done it moves below the path.
+  const tonesDone = completedLessons.includes("tones");
+  const toneGuide = (
+    <div
+      style={{
+        background: t.surface,
+        border: `1px solid ${t.border}`,
+        borderRadius: radius.md,
+        padding: "14px",
+      }}
+    >
+      <ToneReference theme={theme} onPlay={play} playing={playing} />
+    </div>
+  );
+  const rightPanel = (
+    <RightPanel
+      completedLessons={completedLessons}
+      wordCount={wordCount}
+      streak={streak}
+      activity={activity}
+      onStartLesson={onStartLesson}
+      theme={theme}
+      goalText={goalText}
+      deadlineDate={deadlineDate}
+      inline={isMobile}
+    />
+  );
 
   function stateOf(weekIdx, lessonIdx) {
     const id = LESSONS[weekIdx].lessons[lessonIdx].id;
@@ -22,28 +64,26 @@ export default function LearnTab({ completedLessons, onStartLesson, wordCount, s
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px", background: t.bg }}>
-        <div style={{ maxWidth: "460px", marginBottom: "28px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
-            <span style={{ fontSize: "12px", color: t.textSecondary }}>Overall progress</span>
-            <span style={{ fontSize: "12px", color: t.accent, fontWeight: 600 }}>
-              {done} of {total}
-            </span>
-          </div>
-          <div style={{ height: "4px", background: t.border, borderRadius: radius.full, overflow: "hidden" }}>
-            <div
-              style={{
-                height: "100%",
-                width: `${(done / total) * 100}%`,
-                background: t.accent,
-                borderRadius: radius.full,
-                transition: "width 0.5s cubic-bezier(0.4,0,0.2,1)",
-              }}
-            />
-          </div>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: isMobile ? "16px 14px 28px" : "24px 28px",
+          background: t.bg,
+        }}
+      >
+        <div style={{ maxWidth: "560px", display: "flex", flexDirection: "column", gap: "20px", marginBottom: "28px" }}>
+          <ProgressStrip
+            completedLessons={completedLessons}
+            streak={streak}
+            dueCount={dueCount}
+            onReview={onReview}
+            theme={theme}
+          />
+          {!tonesDone && toneGuide}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "32px", maxWidth: "460px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "32px", maxWidth: "560px" }}>
           {LESSONS.map((week, wi) => {
             const weekDone = week.lessons.filter((l) => completedLessons.includes(l.id)).length;
             return (
@@ -96,19 +136,12 @@ export default function LearnTab({ completedLessons, onStartLesson, wordCount, s
               </section>
             );
           })}
+          {tonesDone && toneGuide}
+          {isMobile && rightPanel}
         </div>
       </div>
 
-      <RightPanel
-        completedLessons={completedLessons}
-        wordCount={wordCount}
-        streak={streak}
-        activity={activity}
-        onStartLesson={onStartLesson}
-        theme={theme}
-        goalText={goalText}
-        deadlineDate={deadlineDate}
-      />
+      {!isMobile && rightPanel}
     </div>
   );
 }

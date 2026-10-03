@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { REGIONS, REGION_TYPES } from "@/lib/regions";
+import { themes, font, radius } from "@/lib/theme";
+
+const GEO_URL = "https://raw.githubusercontent.com/longwosion/geojson-map-china/master/china.json";
 
 const PROVINCE_CENTROIDS = {
   beijing:   [116.4, 39.9],
@@ -34,19 +37,36 @@ function matchRegion(name) {
   return map[name] || null;
 }
 
-export default function MapTab({ onStartLesson }) {
+export default function MapTab({ onStartLesson, theme = "light", isMobile = false }) {
+  const t = themes[theme];
+  const styles = makeStyles(t, isMobile);
   const [geoData, setGeoData] = useState(null);
+  const [geoFailed, setGeoFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [hovered, setHovered] = useState(null);
   const [selected, setSelected] = useState(null);
   const [tooltip, setTooltip] = useState(null);
   const svgRef = useRef(null);
+  const detailRef = useRef(null);
 
   useEffect(() => {
-    fetch("https://raw.githubusercontent.com/longwosion/geojson-map-china/master/china.json")
-      .then(r => r.json())
-      .then(setGeoData)
-      .catch(() => setGeoData(null));
-  }, []);
+    let cancelled = false;
+    setGeoFailed(false);
+    fetch(GEO_URL)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Map data ${r.status}`);
+        return r.json();
+      })
+      .then((data) => !cancelled && setGeoData(data))
+      .catch(() => !cancelled && setGeoFailed(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt]);
+
+  useEffect(() => {
+    if (isMobile && selected) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selected, isMobile]);
 
   const region = REGIONS.find(r => r.id === selected);
 
@@ -137,7 +157,16 @@ export default function MapTab({ onStartLesson }) {
                 onClick={() => isMatched && setSelected(rid)}
               />
             );
-          }) : (
+          }) : geoFailed ? (
+            <g style={{ cursor: "pointer" }} onClick={() => setAttempt((n) => n + 1)}>
+              <text x={SVG_W / 2} y={SVG_H / 2 - 8} fill="#8b6a3a" textAnchor="middle" fontSize="18" fontFamily="Georgia, serif">
+                Couldn't load the map.
+              </text>
+              <text x={SVG_W / 2} y={SVG_H / 2 + 18} fill="#b89860" textAnchor="middle" fontSize="15" fontFamily="Georgia, serif" textDecoration="underline">
+                Tap to try again
+              </text>
+            </g>
+          ) : (
             <text x={SVG_W / 2} y={SVG_H / 2} fill="#b89860" textAnchor="middle" fontSize="18" fontFamily="Georgia, serif">
               Loading map...
             </text>
@@ -215,7 +244,7 @@ export default function MapTab({ onStartLesson }) {
                 <rect x={tx} y={ty} width={tw} height={th} rx="6" fill="#fff7ec" stroke="#e8d4a8" strokeWidth="1" />
                 <text x={tx + 10} y={ty + 16} fontSize="13" fontWeight="500" fill="#8b6a3a" fontFamily="'Noto Sans SC', sans-serif">{r.chineseName}</text>
                 <text x={tx + 10} y={ty + 28} fontSize="10" fill="#b89060">{r.name} · {REGION_TYPES[r.type].label}</text>
-                <text x={tx + 10} y={ty + 40} fontSize="10" fill="#c4903a">Click to explore →</text>
+                <text x={tx + 10} y={ty + 40} fontSize="10" fill="#c4903a">{isMobile ? "Tap to explore →" : "Click to explore →"}</text>
               </g>
             );
           })()}
@@ -249,42 +278,49 @@ export default function MapTab({ onStartLesson }) {
             <text x="28" y="66" fontSize="8" fill="#6a5840">Taiwan</text>
             <circle cx="18" cy="78" r="5" fill="#d4b87a" stroke="#b89860" strokeWidth="1.5" strokeDasharray="3 2" />
             <text x="28" y="82" fontSize="8" fill="#6a5840">Diaspora city</text>
-            <text x="10" y="94" fontSize="7" fill="#b89060" fontStyle="italic">Hover to preview · click to explore</text>
+            <text x="10" y="94" fontSize="7" fill="#b89060" fontStyle="italic">{isMobile ? "Tap a region to explore" : "Hover to preview · click to explore"}</text>
           </g>
         </svg>
       </div>
 
       {/* Detail panel */}
-      <div style={styles.detail}>
+      <div style={styles.detail} ref={detailRef}>
         {!region ? (
           <div style={styles.placeholder}>
             <p style={styles.placeholderIcon}>🗺️</p>
-            <p style={styles.placeholderTitle}>Click a region</p>
+            <p style={styles.placeholderTitle}>{isMobile ? "Tap a region" : "Click a region"}</p>
             <p style={styles.placeholderText}>Select a highlighted province, Taiwan, or a diaspora city to explore its accent, culture, and food</p>
           </div>
         ) : (
           <div>
             <div style={styles.detailHeader}>
-              <span style={{ ...styles.typeBadge, background: region.type === "mainland" ? "#fff7ec" : region.type === "taiwan" ? "#eef5e8" : "#f0f5ff", color: region.type === "mainland" ? "#8b6a3a" : region.type === "taiwan" ? "#4a7a3a" : "#4a6abf", border: `1px solid ${region.type === "mainland" ? "#e8d4a8" : region.type === "taiwan" ? "#c8dab8" : "#c8d8f8"}` }}>
+              <span
+                style={{
+                  ...styles.typeBadge,
+                  background: region.type === "mainland" ? t.accentSoft : region.type === "taiwan" ? t.successSoft : "rgba(74,106,191,0.08)",
+                  color: region.type === "mainland" ? t.accent : region.type === "taiwan" ? t.success : "#6a8ad8",
+                  border: `1px solid ${region.type === "mainland" ? t.accentBorder : region.type === "taiwan" ? t.successBorder : "rgba(74,106,191,0.25)"}`,
+                }}
+              >
                 {REGION_TYPES[region.type].label}
               </span>
             </div>
             <h2 style={styles.detailChinese}>{region.chineseName}</h2>
             <h3 style={styles.detailName}>{region.name}</h3>
 
-            <Section title="🗣️ Accent & Speech">
+            <Section styles={styles} title="🗣️ Accent & Speech">
               <p style={styles.detailText}>{region.accent}</p>
             </Section>
-            <Section title="🏮 Culture">
+            <Section styles={styles} title="🏮 Culture">
               <p style={styles.detailText}>{region.culture}</p>
             </Section>
-            <Section title="💡 Local tip">
+            <Section styles={styles} title="💡 Local tip">
               <p style={styles.detailText}>{region.tip}</p>
             </Section>
-            <Section title="🍜 Food vocabulary">
+            <Section styles={styles} title="🍜 Food vocabulary">
               {region.food.map((f, i) => <p key={i} style={{ ...styles.detailText, marginBottom: "4px" }}>• {f}</p>)}
             </Section>
-            <Section title="🎭 Scenarios">
+            <Section styles={styles} title="🎭 Scenarios">
               <div style={styles.scenarioList}>
                 {region.scenarios.map((s, i) => <span key={i} style={styles.scenarioPill}>{s}</span>)}
               </div>
@@ -300,7 +336,7 @@ export default function MapTab({ onStartLesson }) {
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children, styles }) {
   return (
     <div style={styles.section}>
       <p style={styles.sectionTitle}>{title}</p>
@@ -309,23 +345,33 @@ function Section({ title, children }) {
   );
 }
 
-const styles = {
-  container: { display: "flex", height: "100%", overflow: "hidden" },
-  mapWrapper: { flex: "0 0 63%", background: "#e8d8b8", display: "flex", alignItems: "center", justifyContent: "center", padding: "0", borderRight: "1px solid #e0d0b0" },
-  svg: { width: "100%", height: "calc(100vh - 52px)", display: "block" },
-  detail: { flex: 1, overflowY: "auto", padding: "20px", background: "#faf8f4" },
-  placeholder: { height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", textAlign: "center", padding: "24px" },
-  placeholderIcon: { fontSize: "40px", margin: 0 },
-  placeholderTitle: { fontSize: "16px", fontWeight: 500, color: "#2d2520", margin: 0 },
-  placeholderText: { fontSize: "13px", color: "#aaa", maxWidth: "220px", lineHeight: 1.6, margin: 0 },
-  detailHeader: { marginBottom: "8px" },
-  typeBadge: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", fontWeight: 500 },
-  detailChinese: { fontSize: "32px", fontFamily: "'Noto Sans SC', sans-serif", color: "#8b6a3a", margin: "8px 0 2px", fontWeight: 500, lineHeight: 1 },
-  detailName: { fontSize: "18px", color: "#2d2520", fontWeight: 500, margin: "0 0 14px", fontFamily: "Georgia, serif" },
-  section: { marginBottom: "10px", padding: "12px 14px", background: "#ffffff", borderRadius: "10px", border: "1px solid #e8e0d4" },
-  sectionTitle: { fontSize: "12px", fontWeight: 600, color: "#6a5040", margin: "0 0 6px" },
-  detailText: { fontSize: "13px", color: "#6a5840", lineHeight: "1.6", margin: 0 },
-  scenarioList: { display: "flex", flexWrap: "wrap", gap: "5px" },
-  scenarioPill: { fontSize: "11px", padding: "3px 9px", borderRadius: "20px", background: "#fff7ec", border: "1px solid #e8d4a8", color: "#8b6a3a" },
-  startBtn: { width: "100%", marginTop: "14px", padding: "12px", borderRadius: "10px", background: "#8b6a3a", border: "none", color: "#fff7ec", fontSize: "14px", fontWeight: 500, cursor: "pointer", fontFamily: "Georgia, serif" },
-};
+// The map itself keeps its parchment look in both themes; the detail panel follows the app theme.
+// On phones the map sits on top and the whole tab scrolls.
+function makeStyles(t, isMobile) {
+  return {
+    container: isMobile
+      ? { height: "100%", overflowY: "auto", background: t.bg }
+      : { display: "flex", height: "100%", overflow: "hidden" },
+    mapWrapper: isMobile
+      ? { background: "#e8d8b8", borderBottom: `1px solid ${t.border}` }
+      : { flex: "0 0 63%", background: "#e8d8b8", display: "flex", alignItems: "center", justifyContent: "center", borderRight: `1px solid ${t.border}` },
+    svg: { width: "100%", height: isMobile ? "auto" : "100%", display: "block" },
+    detail: isMobile
+      ? { padding: "16px 14px 24px", background: t.bg, scrollMarginTop: "8px" }
+      : { flex: 1, overflowY: "auto", padding: "20px", background: t.bg },
+    placeholder: { height: isMobile ? "auto" : "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", textAlign: "center", padding: isMobile ? "16px" : "24px" },
+    placeholderIcon: { fontSize: "40px", margin: 0 },
+    placeholderTitle: { fontSize: "16px", fontWeight: 500, color: t.text, margin: 0 },
+    placeholderText: { fontSize: "13px", color: t.textMuted, maxWidth: "240px", lineHeight: 1.6, margin: 0 },
+    detailHeader: { marginBottom: "8px" },
+    typeBadge: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", fontWeight: 500 },
+    detailChinese: { fontSize: "32px", fontFamily: font.cn, color: t.accent, margin: "8px 0 2px", fontWeight: 500, lineHeight: 1 },
+    detailName: { fontSize: "18px", color: t.text, fontWeight: 500, margin: "0 0 14px", fontFamily: "Georgia, serif" },
+    section: { marginBottom: "10px", padding: "12px 14px", background: t.surface, borderRadius: radius.md, border: `1px solid ${t.border}` },
+    sectionTitle: { fontSize: "12px", fontWeight: 600, color: t.textSecondary, margin: "0 0 6px" },
+    detailText: { fontSize: "13px", color: t.textSecondary, lineHeight: "1.6", margin: 0 },
+    scenarioList: { display: "flex", flexWrap: "wrap", gap: "5px" },
+    scenarioPill: { fontSize: "11px", padding: "3px 9px", borderRadius: "20px", background: t.accentSoft, border: `1px solid ${t.accentBorder}`, color: t.accent },
+    startBtn: { width: "100%", marginTop: "14px", padding: "12px", borderRadius: radius.md, background: t.accent, border: "none", color: t.btnText, fontSize: "14px", fontWeight: 500, cursor: "pointer", fontFamily: "Georgia, serif" },
+  };
+}

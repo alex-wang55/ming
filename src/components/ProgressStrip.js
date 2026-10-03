@@ -2,7 +2,7 @@
 import { LESSONS } from "@/lib/lessons";
 import { themes, radius } from "@/lib/theme";
 
-export default function ProgressStrip({ completedLessons, streak, dueCount = 0, theme }) {
+export default function ProgressStrip({ completedLessons, streak, dueCount = 0, onReview, theme }) {
   const t = themes[theme];
 
   const found = LESSONS.findIndex((w) => w.lessons.some((l) => !completedLessons.includes(l.id)));
@@ -19,18 +19,30 @@ export default function ProgressStrip({ completedLessons, streak, dueCount = 0, 
         padding: "12px 15px",
         display: "flex",
         alignItems: "center",
-        gap: "18px",
+        gap: "16px",
+        boxShadow: t.shadow,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
-          <span style={{ fontSize: "11.5px", color: t.text, fontWeight: 500 }}>{week.weekTitle}</span>
-          <span style={{ fontSize: "11px", color: t.accent, fontWeight: 600 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginBottom: "6px" }}>
+          <span
+            style={{
+              fontSize: "11.5px",
+              color: t.text,
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {week.weekTitle}
+          </span>
+          <span style={{ fontSize: "11px", color: t.accent, fontWeight: 600, flexShrink: 0 }}>
             {done} / {week.lessons.length}
           </span>
         </div>
         <div style={{ display: "flex", gap: "3px" }}>
-          {week.lessons.map((l, i) => (
+          {week.lessons.map((l) => (
             <div
               key={l.id}
               style={{
@@ -44,19 +56,42 @@ export default function ProgressStrip({ completedLessons, streak, dueCount = 0, 
         </div>
       </div>
 
-      <div style={{ width: "1px", height: "30px", background: t.border }} />
+      <div style={{ width: "1px", height: "30px", background: t.border, flexShrink: 0 }} />
 
       <Stat value={streak} label="day streak" color={t.warning} t={t} />
-      <Stat value={dueCount} label="due today" color={t.accent} t={t} />
+      <Stat
+        value={dueCount}
+        label="to review"
+        color={t.accent}
+        t={t}
+        onClick={dueCount > 0 ? onReview : undefined}
+      />
     </div>
   );
 }
 
-function Stat({ value, label, color, t }) {
-  return (
-    <div style={{ textAlign: "center" }}>
+function Stat({ value, label, color, t, onClick }) {
+  const content = (
+    <>
       <p style={{ fontSize: "16px", fontWeight: 700, color, margin: 0, lineHeight: 1.1 }}>{value}</p>
-      <p style={{ fontSize: "9.5px", color: t.textMuted, margin: 0 }}>{label}</p>
-    </div>
+      <p style={{ fontSize: "9.5px", color: t.textMuted, margin: 0, whiteSpace: "nowrap" }}>{label}</p>
+    </>
+  );
+  if (!onClick) return <div style={{ textAlign: "center", flexShrink: 0 }}>{content}</div>;
+  return (
+    <button
+      onClick={onClick}
+      title="Start a review"
+      style={{
+        textAlign: "center",
+        flexShrink: 0,
+        background: t.accentSoft,
+        border: `1px solid ${t.accentBorder}`,
+        borderRadius: radius.sm,
+        padding: "4px 8px",
+      }}
+    >
+      {content}
+    </button>
   );
 }

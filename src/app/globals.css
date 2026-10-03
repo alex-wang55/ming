@@ -1,20 +1,55 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;500;700&display=swap');
 
+/* Only for things that render before React knows the theme (loading, error pages).
+   Components use the theme object in src/lib/theme.js. */
+:root {
+  --bg: #faf8f4;
+  --text: #1f1a14;
+  --muted: #a89d8e;
+  --border: #e8e0d4;
+  --accent: #8b6a3a;
+  --accent-soft: #fff7ec;
+  --accent-border: #e8d4a8;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0a0a08;
+  --text: #f0ece0;
+  --muted: #6b6354;
+  --border: rgba(212,168,67,0.10);
+  --accent: #d4a843;
+  --accent-soft: rgba(212,168,67,0.07);
+  --accent-border: rgba(212,168,67,0.20);
+  color-scheme: dark;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body { height: 100%; }
+html, body { height: 100%; overscroll-behavior-y: none; }
 
 body {
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
   font-feature-settings: 'cv02','cv03','cv04','cv11';
 }
 
+/* Full-height app shell that accounts for mobile browser toolbars. */
+.app-root { height: 100vh; height: 100dvh; }
+
 button, input, textarea, select { font-family: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button:disabled { cursor: not-allowed; }
+
+/* iOS zooms the page when focusing an input smaller than 16px. */
+@media (max-width: 768px) {
+  input, textarea, select { font-size: 16px !important; }
+}
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -31,4 +66,8 @@ button { cursor: pointer; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid rgba(212,168,67,0.5);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

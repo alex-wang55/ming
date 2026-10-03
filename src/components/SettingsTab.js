@@ -1,48 +1,30 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { themes, radius } from "@/lib/theme";
+import { useInstallPrompt } from "@/lib/hooks";
 
-export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGoal }) {
-  const t = themes[theme];
-  const [autoplay, setAutoplay] = useState(true);
-  const [reminders, setReminders] = useState(true);
-  const [pinyin, setPinyin] = useState("always");
-  const [pace, setPace] = useState("adaptive");
-  const [saved, setSaved] = useState(false);
+export default function SettingsTab({ user, settings, updateSettings, profile, onUpdateProfile }) {
+  const t = themes[settings.theme];
   const [goal, setGoal] = useState(profile?.goal_text || "");
   const [deadline, setDeadline] = useState(profile?.deadline_date || "");
-  const [goalSaved, setGoalSaved] = useState(false);
+  const [goalState, setGoalState] = useState("idle"); // idle | saving | saved | error
+  const install = useInstallPrompt();
+
+  const goalChanged = goal.trim() !== (profile?.goal_text || "") || deadline !== (profile?.deadline_date || "");
 
   async function saveGoal() {
-    await supabase
-      .from("profiles")
-      .update({ goal_text: goal.trim() || null, deadline_date: deadline || null })
-      .eq("id", user.id);
-    onUpdateGoal({ goal_text: goal.trim() || null, deadline_date: deadline || null });
-    setGoalSaved(true);
-    setTimeout(() => setGoalSaved(false), 1800);
-  }
-
-  useEffect(() => {
-    const raw = localStorage.getItem("ming-settings");
-    if (!raw) return;
-    try {
-      const s = JSON.parse(raw);
-      if (typeof s.autoplay === "boolean") setAutoplay(s.autoplay);
-      if (typeof s.reminders === "boolean") setReminders(s.reminders);
-      if (s.pinyin) setPinyin(s.pinyin);
-      if (s.pace) setPace(s.pace);
-    } catch {}
-  }, []);
-
-  function save() {
-    localStorage.setItem(
-      "ming-settings",
-      JSON.stringify({ autoplay, reminders, pinyin, pace, theme })
-    );
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
+    setGoalState("saving");
+    const patch = { goal_text: goal.trim() || null, deadline_date: deadline || null };
+    const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("id");
+    if (error || !data?.length) {
+      console.error("Goal save failed:", error);
+      setGoalState("error");
+      return;
+    }
+    onUpdateProfile(patch);
+    setGoalState("saved");
+    setTimeout(() => setGoalState("idle"), 1800);
   }
 
   return (
@@ -51,7 +33,7 @@ export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGo
         style={{
           maxWidth: "580px",
           margin: "0 auto",
-          padding: "26px 26px 40px",
+          padding: "22px 16px 40px",
           display: "flex",
           flexDirection: "column",
           gap: "14px",
@@ -61,8 +43,8 @@ export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGo
           <Row title="Theme" sub="Light for daytime, dark for focus" t={t}>
             <Segmented
               t={t}
-              value={theme}
-              onChange={setTheme}
+              value={settings.theme}
+              onChange={(theme) => updateSettings({ theme })}
               options={[
                 { id: "light", label: "Light" },
                 { id: "dark", label: "Dark" },
@@ -77,7 +59,9 @@ export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGo
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
               placeholder="What are you learning Mandarin for?"
+              aria-label="Your Mandarin goal"
               rows={2}
+              maxLength={300}
               style={{
                 width: "100%",
                 background: t.bg,
@@ -89,59 +73,76 @@ export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGo
                 resize: "none",
                 outline: "none",
                 marginBottom: "8px",
-                boxSizing: "border-box",
               }}
             />
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              style={{
-                background: t.bg,
-                border: `1px solid ${t.border}`,
-                borderRadius: radius.md,
-                padding: "8px 10px",
-                fontSize: "13px",
-                color: t.text,
-                outline: "none",
-                marginBottom: "10px",
-              }}
-            />
+            <label style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "12.5px", color: t.textSecondary }}>Deadline (optional)</span>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                style={{
+                  background: t.bg,
+                  border: `1px solid ${t.border}`,
+                  borderRadius: radius.md,
+                  padding: "7px 10px",
+                  fontSize: "13px",
+                  color: t.text,
+                  outline: "none",
+                }}
+              />
+              {deadline && (
+                <button
+                  onClick={() => setDeadline("")}
+                  style={{ background: "none", border: "none", color: t.textMuted, fontSize: "12px", padding: 0 }}
+                >
+                  Clear
+                </button>
+              )}
+            </label>
             <button
               onClick={saveGoal}
+              disabled={!goalChanged || goalState === "saving"}
               style={{
                 width: "100%",
                 padding: "9px",
                 borderRadius: radius.md,
-                background: goalSaved ? t.successSoft : t.accentSoft,
-                border: `1px solid ${goalSaved ? t.successBorder : t.accentBorder}`,
-                color: goalSaved ? t.success : t.accent,
+                background: goalState === "saved" ? t.successSoft : t.accentSoft,
+                border: `1px solid ${goalState === "saved" ? t.successBorder : t.accentBorder}`,
+                color: goalState === "saved" ? t.success : t.accent,
                 fontSize: "12.5px",
                 fontWeight: 600,
+                opacity: !goalChanged && goalState === "idle" ? 0.5 : 1,
               }}
             >
-              {goalSaved ? "Saved" : "Update goal"}
+              {goalState === "saving" ? "Saving..." : goalState === "saved" ? "Saved" : "Update goal"}
             </button>
+            {goalState === "error" && (
+              <p role="alert" style={{ fontSize: "12px", color: t.danger, margin: "8px 0 0" }}>
+                Couldn't save your goal. Try again in a moment.
+              </p>
+            )}
           </div>
         </Group>
 
         <Group label="Learning" t={t}>
           <Toggle
             title="Autoplay pronunciation"
-            sub="Play audio when Ming introduces a new word"
-            value={autoplay}
-            onChange={setAutoplay}
+            sub="Play the first new word when Ming introduces it"
+            value={settings.autoplay}
+            onChange={(autoplay) => updateSettings({ autoplay })}
             t={t}
           />
           <Divider t={t} />
-          <Row title="Pinyin" sub="When to show pronunciation guides" t={t}>
+          <Row title="Pinyin" sub="When Ming writes pronunciation guides" t={t}>
             <Select
               t={t}
-              value={pinyin}
-              onChange={setPinyin}
+              label="Pinyin"
+              value={settings.pinyin}
+              onChange={(pinyin) => updateSettings({ pinyin })}
               options={[
                 { v: "always", l: "Always" },
-                { v: "hover", l: "On hover" },
+                { v: "new", l: "New words only" },
                 { v: "never", l: "Hidden" },
               ]}
             />
@@ -150,8 +151,9 @@ export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGo
           <Row title="Pace" sub="How fast new material is introduced" t={t}>
             <Select
               t={t}
-              value={pace}
-              onChange={setPace}
+              label="Pace"
+              value={settings.pace}
+              onChange={(pace) => updateSettings({ pace })}
               options={[
                 { v: "slow", l: "Slow" },
                 { v: "adaptive", l: "Adaptive" },
@@ -161,14 +163,37 @@ export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGo
           </Row>
         </Group>
 
-        <Group label="Notifications" t={t}>
-          <Toggle
-            title="Daily reminders"
-            sub="A nudge to practice and keep your streak"
-            value={reminders}
-            onChange={setReminders}
+        <Group label="App" t={t}>
+          <Row
+            title={install.standalone ? "Installed" : "Install Ming"}
+            sub={
+              install.standalone
+                ? "You're using the app version."
+                : install.event
+                ? "Add Ming to your home screen or desktop, like a regular app."
+                : install.ios
+                ? "In Safari, tap Share, then Add to Home Screen."
+                : "Use your browser menu: Install app, or Add to Home screen."
+            }
             t={t}
-          />
+          >
+            {!install.standalone && install.event && (
+              <button
+                onClick={install.install}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: radius.sm,
+                  background: t.accent,
+                  border: "none",
+                  color: t.btnText,
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                }}
+              >
+                Install
+              </button>
+            )}
+          </Row>
         </Group>
 
         <Group label="Account" t={t}>
@@ -190,25 +215,8 @@ export default function SettingsTab({ user, theme, setTheme, profile, onUpdateGo
           </Row>
         </Group>
 
-        <button
-          onClick={save}
-          style={{
-            padding: "13px",
-            borderRadius: radius.md,
-            background: saved ? t.successSoft : t.accent,
-            border: `1px solid ${saved ? t.successBorder : t.accent}`,
-            color: saved ? t.success : t.btnText,
-            fontSize: "14px",
-            fontWeight: 600,
-            transition: "all 0.2s",
-            marginTop: "4px",
-          }}
-        >
-          {saved ? "Saved" : "Save changes"}
-        </button>
-
         <p style={{ fontSize: "11px", color: t.textFaint, textAlign: "center", margin: "6px 0 0" }}>
-          Ming v1.0 · Next.js, Supabase, Claude, Google TTS
+          Settings save automatically · Ming v1.1
         </p>
       </div>
     </div>
@@ -250,9 +258,9 @@ function Row({ title, sub, children, t }) {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", padding: "14px 0" }}>
       <div style={{ minWidth: 0 }}>
         <p style={{ fontSize: "13.5px", fontWeight: 500, color: t.text, margin: "0 0 2px" }}>{title}</p>
-        <p style={{ fontSize: "12px", color: t.textMuted, margin: 0, lineHeight: 1.45 }}>{sub}</p>
+        <p style={{ fontSize: "12px", color: t.textMuted, margin: 0, lineHeight: 1.45, overflowWrap: "anywhere" }}>{sub}</p>
       </div>
-      <div style={{ flexShrink: 0 }}>{children}</div>
+      {children && <div style={{ flexShrink: 0 }}>{children}</div>}
     </div>
   );
 }
@@ -265,6 +273,9 @@ function Toggle({ title, sub, value, onChange, t }) {
   return (
     <Row title={title} sub={sub} t={t}>
       <button
+        role="switch"
+        aria-checked={value}
+        aria-label={title}
         onClick={() => onChange(!value)}
         style={{
           width: "42px",
@@ -298,6 +309,7 @@ function Toggle({ title, sub, value, onChange, t }) {
 function Segmented({ value, onChange, options, t }) {
   return (
     <div
+      role="radiogroup"
       style={{
         display: "flex",
         gap: "2px",
@@ -310,6 +322,8 @@ function Segmented({ value, onChange, options, t }) {
       {options.map((o) => (
         <button
           key={o.id}
+          role="radio"
+          aria-checked={value === o.id}
           onClick={() => onChange(o.id)}
           style={{
             padding: "6px 14px",
@@ -329,10 +343,11 @@ function Segmented({ value, onChange, options, t }) {
   );
 }
 
-function Select({ value, onChange, options, t }) {
+function Select({ value, onChange, options, label, t }) {
   return (
     <select
       value={value}
+      aria-label={label}
       onChange={(e) => onChange(e.target.value)}
       style={{
         padding: "7px 10px",

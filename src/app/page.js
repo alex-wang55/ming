@@ -1,53 +1,41 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { themes, font } from "@/lib/theme";
-import Message from "@/components/Message";
-import ChatInput from "@/components/ChatInput";
+import { postJSON } from "@/lib/api";
+import { speak } from "@/lib/audio";
+import { useSettings } from "@/lib/settings";
+import { localDateKey } from "@/lib/dates";
+import { isDue, nextReview } from "@/lib/review";
+import { parseToneTags } from "@/lib/tags";
 import Auth from "@/components/Auth";
-import UserMenu from "@/components/UserMenu";
-import MapTab from "@/components/MapTab";
-import Sidebar from "@/components/Sidebar";
-import LearnTab from "@/components/LearnTab";
-import WordsTab from "@/components/WordsTab";
-import SettingsTab from "@/components/SettingsTab";
 import GoalSetup from "@/components/GoalSetup";
-import Checkpoint from "@/components/Checkpoint";
+import AppShell from "@/components/AppShell";
+import LoadingScreen from "@/components/LoadingScreen";
 
-const WELCOME = {
-  role: "assistant",
-  content:
-    "嗨！Hi! I'm Ming — your personal Mandarin coach. Before we dive in, tell me: what's your reason for learning Mandarin? There's no wrong answer.",
-};
-
-const HEADINGS = {
-  learn: ["Your lesson path", (s) => `${s.done} of ${s.total} lessons complete`],
-  chat: ["Chat with Ming", () => "Free conversation"],
-  map: ["Regional map", () => "Explore accents and culture by region"],
-  words: ["Your vocabulary", (s) => `${s.wordCount} words learned`],
-  settings: ["Settings", () => "Manage your preferences"],
-};
+const WORD_FIELDS = "id, chinese, pinyin, meaning, times_seen, last_seen, next_review, created_at";
+const NETWORK_ERROR = "Couldn't reach Ming — check your connection and try again.";
 
 export default function Home() {
+  const [settings, updateSettings] = useSettings();
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [recovery, setRecovery] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
   const [tab, setTab] = useState("learn");
-  const [messages, setMessages] = useState([WELCOME]);
-  const [conversationId, setConversationId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [wordCount, setWordCount] = useState(0);
+  const [usageLeft, setUsageLeft] = useState(null);
+  const [words, setWords] = useState([]);
+  const [wordsLoading, setWordsLoading] = useState(true);
   const [completedLessons, setCompletedLessons] = useState([]);
   const [streak, setStreak] = useState(0);
   const [activity, setActivity] = useState([]);
   const [currentLesson, setCurrentLesson] = useState(null);
-  const [theme, setTheme] = useState("light");
-  const [checkpointWords, setCheckpointWords] = useState(null);
-  const bottomRef = useRef(null);
+  const [review, setReview] = useState(null);
+  const conversationId = useRef(null);
   const loadedUserId = useRef(null);
-
-  const t = themes[theme];
+  const sending = useRef(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -56,97 +44,95 @@ export default function Home() {
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_e, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
       setUser(session?.user ?? null);
-      if (!session) {
-        setMessages([WELCOME]);
-        setConversationId(null);
-      }
+      if (!session) resetState();
     });
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    const raw = localStorage.getItem("ming-settings");
-    if (!raw) return;
-    try {
-      const s = JSON.parse(raw);
-      if (s.theme) setTheme(s.theme);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
     // Supabase re-emits a fresh session (and so a fresh user object) on token
-    // refresh, not just on sign-in. Only reload everything when the signed-in
-    // user actually changes, otherwise a routine refresh re-fetches the
-    // profile and can flicker the goal-setup screen if that fetch hiccups.
+    // refresh, not just on sign-in. Only reload when the signed-in user changes.
     if (user && user.id !== loadedUserId.current) {
       loadedUserId.current = user.id;
-      loadProfile();
-      loadConversation();
-      loadWordCount();
-      loadProgress();
-      loadActivity();
+      loadProfile(user.id);
+      loadConversation(user.id);
+      loadWords(user.id);
+      loadProgress(user.id);
+      loadActivity(user.id);
     }
   }, [user]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  function resetState() {
+    loadedUserId.current = null;
+    conversationId.current = null;
+    setProfile(null);
+    setMessages([]);
+    setWords([]);
+    setWordsLoading(true);
+    setCompletedLessons([]);
+    setActivity([]);
+    setStreak(0);
+    setCurrentLesson(null);
+    setReview(null);
+    setUsageLeft(null);
+    setTab("learn");
+  }
 
-  async function loadProfile() {
+  async function loadProfile(uid) {
     const { data, error } = await supabase
       .from("profiles")
       .select("goal_text, deadline_date, onboarding_skipped")
-      .eq("id", user.id)
-      .single();
-    // PGRST116 = no row found, which legitimately means a brand-new profile.
-    // Any other error is transient (network blip, etc.) — don't let it wipe
-    // an already-loaded profile and kick the user back into goal setup.
-    if (error && error.code !== "PGRST116") {
-      setProfileLoading(false);
+      .eq("id", uid)
+      .maybeSingle();
+    // A failed fetch must never look like "no goal set", or returning users get
+    // sent back into onboarding.
+    if (error) {
+      console.error("Profile load failed:", error);
+      setProfileError(true);
       return;
     }
+    setProfileError(false);
     setProfile(data || { goal_text: null, deadline_date: null, onboarding_skipped: false });
-    setProfileLoading(false);
   }
 
-  async function loadConversation() {
+  async function loadConversation(uid) {
     const { data } = await supabase
       .from("conversations")
-      .select("*")
-      .eq("user_id", user.id)
+      .select("id, messages")
+      .eq("user_id", uid)
       .order("updated_at", { ascending: false })
       .limit(1)
-      .single();
-    if (data && data.messages.length > 0) {
-      setMessages([WELCOME, ...data.messages]);
-      setConversationId(data.id);
+      .maybeSingle();
+    if (data?.messages?.length) {
+      setMessages(data.messages);
+      conversationId.current = data.id;
     }
   }
 
-  async function loadWordCount() {
-    const { count } = await supabase
+  async function loadWords(uid) {
+    const { data, error } = await supabase
       .from("words")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id);
-    setWordCount(count || 0);
+      .select(WORD_FIELDS)
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false });
+    if (!error) setWords(data || []);
+    setWordsLoading(false);
   }
 
-  async function loadProgress() {
-    const { data } = await supabase
-      .from("lesson_progress")
-      .select("lesson_id")
-      .eq("user_id", user.id);
+  async function loadProgress(uid) {
+    const { data } = await supabase.from("lesson_progress").select("lesson_id").eq("user_id", uid);
     setCompletedLessons(data ? data.map((d) => d.lesson_id) : []);
   }
 
-  // Streak with a 1-day-per-week freeze so a single missed day doesn't reset it
-  async function loadActivity() {
+  // Streak with a 1-day-per-week freeze so a single missed day doesn't reset it.
+  async function loadActivity(uid) {
     const { data } = await supabase
       .from("daily_activity")
       .select("activity_date, session_count")
-      .eq("user_id", user.id)
+      .eq("user_id", uid)
       .order("activity_date", { ascending: false })
       .limit(90);
 
@@ -158,11 +144,10 @@ export default function Home() {
     let freezeUsed = false;
     let daysSinceFreeze = 0;
     const cursor = new Date();
-    if (!dates.has(cursor.toISOString().slice(0, 10))) cursor.setDate(cursor.getDate() - 1);
+    if (!dates.has(localDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
 
     for (let i = 0; i < 400; i++) {
-      const key = cursor.toISOString().slice(0, 10);
-      if (dates.has(key)) {
+      if (dates.has(localDateKey(cursor))) {
         count++;
         daysSinceFreeze++;
       } else if (!freezeUsed && daysSinceFreeze < 7) {
@@ -177,40 +162,99 @@ export default function Home() {
   }
 
   async function recordActivity() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateKey();
     const { data } = await supabase
       .from("daily_activity")
       .select("session_count")
       .eq("user_id", user.id)
       .eq("activity_date", today)
-      .single();
+      .maybeSingle();
 
-    await supabase.from("daily_activity").upsert(
-      { user_id: user.id, activity_date: today, session_count: (data?.session_count || 0) + 1 },
-      { onConflict: "user_id,activity_date" }
-    );
-    loadActivity();
+    await supabase
+      .from("daily_activity")
+      .upsert(
+        { user_id: user.id, activity_date: today, session_count: (data?.session_count || 0) + 1 },
+        { onConflict: "user_id,activity_date" }
+      );
+    loadActivity(user.id);
   }
 
-  async function saveConversation(updated) {
-    const apiMessages = updated.slice(1);
-    if (conversationId) {
+  async function saveConversation(all) {
+    const clean = all.filter((m) => !m.error).map(({ role, content }) => ({ role, content }));
+    if (conversationId.current) {
       await supabase
         .from("conversations")
-        .update({ messages: apiMessages, updated_at: new Date().toISOString() })
-        .eq("id", conversationId);
+        .update({ messages: clean, updated_at: new Date().toISOString() })
+        .eq("id", conversationId.current);
     } else {
       const { data } = await supabase
         .from("conversations")
-        .insert({ user_id: user.id, messages: apiMessages })
-        .select()
+        .insert({ user_id: user.id, messages: clean })
+        .select("id")
         .single();
-      if (data) setConversationId(data.id);
+      if (data) conversationId.current = data.id;
     }
   }
 
-  async function markLessonComplete(lessonId) {
-    if (!user) return;
+  // `base` lets a new lesson start from an empty chat; otherwise continue the current one.
+  async function sendMessage(text, base = messages) {
+    const content = text.trim();
+    if (!content || sending.current) return;
+    sending.current = true;
+
+    const history = [...base, { role: "user", content }];
+    setMessages(history);
+    setLoading(true);
+
+    try {
+      const res = await postJSON("/api/chat", {
+        messages: history.filter((m) => !m.error),
+        preferences: { pinyin: settings.pinyin, pace: settings.pace },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (typeof data.remaining === "number") setUsageLeft(data.remaining);
+
+      if (!res.ok || !data.reply) {
+        setMessages([...history, { role: "assistant", content: data.error || NETWORK_ERROR, error: true }]);
+        return;
+      }
+
+      const final = [...history, { role: "assistant", content: data.reply }];
+      setMessages(final);
+      saveConversation(final);
+      recordActivity();
+      if (data.newWords) loadWords(user.id);
+      if (settings.autoplay) {
+        const [first] = parseToneTags(data.reply);
+        if (first) speak(first.hanzi).catch(() => {}); // browsers may block autoplay; that's fine
+      }
+    } catch (err) {
+      console.error(err);
+      setMessages([...history, { role: "assistant", content: NETWORK_ERROR, error: true }]);
+    } finally {
+      sending.current = false;
+      setLoading(false);
+    }
+  }
+
+  function startConversation(prompt, lesson) {
+    if (sending.current) return;
+    setCurrentLesson(lesson);
+    conversationId.current = null; // each lesson gets its own saved conversation
+    setTab("chat");
+    sendMessage(prompt, []);
+  }
+
+  function handleStartRegion(region) {
+    startConversation(
+      `I want to focus on ${region.name} (${region.chineseName}). Teach me the language, accent, and culture specific to this region.`,
+      null
+    );
+  }
+
+  async function handleFinishLesson() {
+    if (!currentLesson) return;
+    const lessonId = currentLesson.id;
     const { error } = await supabase
       .from("lesson_progress")
       .upsert(
@@ -223,359 +267,73 @@ export default function Home() {
     }
     const next = [...new Set([...completedLessons, lessonId])];
     setCompletedLessons(next);
-
-    // Every 3rd completed lesson: pull up to 3 recent words for a quick checkpoint
-    if (next.length % 3 === 0) {
-      const { data } = await supabase
-        .from("words")
-        .select("chinese, pinyin, meaning")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(3);
-      if (data && data.length) setCheckpointWords(data);
-    }
-  }
-
-  async function sendMessage(text) {
-    if (!text.trim() || loading) return;
-    const updated = [...messages, { role: "user", content: text }];
-    setMessages(updated);
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updated.slice(1), userId: user?.id }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setMessages([...updated, { role: "assistant", content: data.error }]);
-        return;
-      }
-      const final = [...updated, { role: "assistant", content: data.reply }];
-      setMessages(final);
-      if (user) {
-        await saveConversation(final);
-        loadWordCount();
-        recordActivity();
-      }
-    } catch (err) {
-      console.error(err);
-      setMessages([
-        ...updated,
-        { role: "assistant", content: "Something went wrong — try again in a moment." },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleStartLesson(lesson) {
-    setCurrentLesson(lesson);
-    setMessages([WELCOME]);
-    setTab("chat");
-    sendMessage(lesson.prompt);
-  }
-
-  function handleStartRegion(region) {
-    setCurrentLesson(null);
-    setMessages([WELCOME]);
-    setTab("chat");
-    sendMessage(
-      `I want to focus on ${region.name} (${region.chineseName}). Teach me the language, accent, and culture specific to this region.`
-    );
-  }
-
-  async function handleFinishLesson() {
-    if (!currentLesson) return;
-    await markLessonComplete(currentLesson.id);
     setCurrentLesson(null);
     setTab("learn");
+
+    // Every 3rd lesson: a quick check on the most recent words.
+    if (next.length % 3 === 0 && words.length) {
+      openReview("Quick check", words.slice(0, 3));
+    }
   }
 
-  function handleGoalDone(newProfile) {
-    setProfile(newProfile);
+  function openReview(title, list) {
+    if (list.length) setReview({ id: Date.now(), title, words: list });
   }
 
-  if (authLoading) return <LoadingScreen t={t} />;
-  if (!user) return <Auth />;
-  if (profileLoading) return <LoadingScreen t={t} />;
-  if (profile === null) return <LoadingScreen t={t} />; // profile hasn't loaded yet, never show GoalSetup on a null
+  function startReview() {
+    const due = words
+      .filter((w) => isDue(w))
+      .sort((a, b) => new Date(a.next_review) - new Date(b.next_review));
+    openReview("Review", due.slice(0, 20));
+  }
+
+  async function rateWord(word, rating) {
+    const patch = nextReview(word, rating);
+    setWords((ws) => ws.map((w) => (w.id === word.id ? { ...w, ...patch } : w)));
+    const { error } = await supabase.from("words").update(patch).eq("id", word.id);
+    if (error) console.error("Saving review failed:", error);
+  }
+
+  function updateProfile(patch) {
+    setProfile((p) => ({ ...p, ...patch }));
+  }
+
+  if (recovery) {
+    return <Auth theme={settings.theme} recovery onRecovered={() => setRecovery(false)} />;
+  }
+  if (authLoading) return <LoadingScreen />;
+  if (!user) return <Auth theme={settings.theme} />;
+  if (!profile) return <LoadingScreen error={profileError} onRetry={() => loadProfile(user.id)} />;
   if (!profile.goal_text && !profile.onboarding_skipped) {
-    return <GoalSetup user={user} theme={theme} onDone={handleGoalDone} />;
+    return <GoalSetup user={user} theme={settings.theme} onDone={updateProfile} />;
   }
 
-  const totalLessons = 18;
-  const stats = { done: completedLessons.length, total: totalLessons, wordCount };
-  const [headTitle, headSubFn] = HEADINGS[tab];
-  const headSub = tab === "chat" && currentLesson ? currentLesson.sub : headSubFn(stats);
-  const title = tab === "chat" && currentLesson ? currentLesson.title : headTitle;
-
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", background: t.bg }}>
-      <Sidebar tab={tab} setTab={setTab} theme={theme} />
-
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: t.bg }}>
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 24px",
-            height: "56px",
-            flexShrink: 0,
-            borderBottom: `1px solid ${t.border}`,
-            background: t.bg,
-          }}
-        >
-          <div>
-            <p style={{ fontSize: "15px", fontWeight: 600, color: t.text, margin: 0, letterSpacing: "-0.01em" }}>
-              {title}
-            </p>
-            <p style={{ fontSize: "12px", color: t.textMuted, margin: 0 }}>{headSub}</p>
-          </div>
-          <UserMenu user={user} wordCount={wordCount} streak={streak} theme={theme} />
-        </header>
-
-        {tab === "learn" && (
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <LearnTab
-              completedLessons={completedLessons}
-              onStartLesson={handleStartLesson}
-              wordCount={wordCount}
-              streak={streak}
-              activity={activity}
-              theme={theme}
-              goalText={profile?.goal_text}
-              deadlineDate={profile?.deadline_date}
-            />
-          </div>
-        )}
-
-        {tab === "chat" && (
-          <>
-            <main style={{ flex: 1, overflowY: "auto", position: "relative", background: t.bg }}>
-              {messages.length === 1 && <EmptyState t={t} />}
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "16px",
-                  padding: "24px",
-                  maxWidth: "720px",
-                  margin: "0 auto",
-                }}
-              >
-                {messages.map((msg, i) => (
-                  <Message key={i} message={msg} theme={theme} />
-                ))}
-                {loading && <TypingIndicator t={t} />}
-                <div ref={bottomRef} />
-              </div>
-            </main>
-
-            <footer
-              style={{
-                flexShrink: 0,
-                borderTop: `1px solid ${t.border}`,
-                background: t.bg,
-                padding: "12px 24px 20px",
-              }}
-            >
-              <div style={{ maxWidth: "720px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-                {currentLesson && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      background: t.accentSoft,
-                      border: `1px solid ${t.accentBorder}`,
-                      borderRadius: "10px",
-                      padding: "8px 14px",
-                    }}
-                  >
-                    <span style={{ fontSize: "12px", color: t.accent }}>
-                      Lesson · {currentLesson.title}
-                    </span>
-                    <button
-                      onClick={handleFinishLesson}
-                      style={{
-                        fontSize: "12px",
-                        padding: "5px 12px",
-                        borderRadius: "7px",
-                        background: t.surface,
-                        border: `1px solid ${t.accentBorder}`,
-                        color: t.accent,
-                        fontWeight: 500,
-                      }}
-                    >
-                      Mark complete
-                    </button>
-                  </div>
-                )}
-                <ChatInput onSend={sendMessage} disabled={loading} theme={theme} />
-              </div>
-            </footer>
-          </>
-        )}
-
-        {tab === "map" && (
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <MapTab onStartLesson={handleStartRegion} theme={theme} />
-          </div>
-        )}
-
-        {tab === "words" && (
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <WordsTab userId={user.id} theme={theme} />
-          </div>
-        )}
-
-        {tab === "settings" && (
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <SettingsTab
-              user={user}
-              theme={theme}
-              setTheme={setTheme}
-              profile={profile}
-              onUpdateGoal={(newProfile) => setProfile(newProfile)}
-            />
-          </div>
-        )}
-      </div>
-
-      {checkpointWords && (
-        <Checkpoint
-          words={checkpointWords}
-          theme={theme}
-          onFinish={() => setCheckpointWords(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function LoadingScreen({ t }) {
-  return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        background: t.bg,
-        gap: "18px",
-      }}
-    >
-      <div style={{ position: "relative", width: "72px", height: "72px" }}>
-        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${t.border}` }} />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "50%",
-            border: "2px solid transparent",
-            borderTopColor: t.accent,
-            animation: "spin 1.1s linear infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: "10px",
-            borderRadius: "50%",
-            background: t.accentSoft,
-            border: `1px solid ${t.accentBorder}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <span style={{ fontFamily: font.cn, fontSize: "24px", color: t.accent, fontWeight: 700 }}>明</span>
-        </div>
-      </div>
-      <div style={{ textAlign: "center" }}>
-        <p style={{ fontSize: "18px", fontWeight: 600, color: t.text, margin: "0 0 3px" }}>Ming</p>
-        <p style={{ fontSize: "12.5px", color: t.textMuted, margin: 0 }}>Your Mandarin coach</p>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ t }) {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%,-60%)",
-        textAlign: "center",
-        pointerEvents: "none",
-      }}
-    >
-      <div style={{ fontFamily: font.cn, fontSize: "44px", color: t.accent, opacity: 0.15, marginBottom: "10px" }}>
-        明
-      </div>
-      <p style={{ fontSize: "16px", fontWeight: 500, color: t.textFaint, margin: "0 0 6px" }}>
-        Ready when you are
-      </p>
-      <p style={{ fontSize: "13px", color: t.textFaint, maxWidth: "280px", margin: "0 auto" }}>
-        Pick a lesson from the Learn tab, or just start talking.
-      </p>
-    </div>
-  );
-}
-
-function TypingIndicator({ t }) {
-  return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-      <div
-        style={{
-          width: "28px",
-          height: "28px",
-          borderRadius: "999px",
-          background: t.accentSoft,
-          border: `1px solid ${t.accentBorder}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          marginTop: "2px",
-        }}
-      >
-        <span style={{ fontFamily: font.cn, fontSize: "12px", color: t.accent, fontWeight: 700 }}>明</span>
-      </div>
-      <div
-        style={{
-          background: t.surface,
-          border: `1px solid ${t.border}`,
-          borderRadius: "14px 14px 14px 4px",
-          padding: "13px 16px",
-          display: "flex",
-          gap: "5px",
-          alignItems: "center",
-          boxShadow: t.shadow,
-        }}
-      >
-        {[0, 0.15, 0.3].map((d, i) => (
-          <span
-            key={i}
-            style={{
-              display: "inline-block",
-              width: "5px",
-              height: "5px",
-              borderRadius: "50%",
-              background: t.textMuted,
-              animation: "bounce 1.2s infinite ease-in-out",
-              animationDelay: `${d}s`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
+    <AppShell
+      user={user}
+      profile={profile}
+      settings={settings}
+      updateSettings={updateSettings}
+      tab={tab}
+      setTab={setTab}
+      messages={messages}
+      loading={loading}
+      usageLeft={usageLeft}
+      words={words}
+      wordsLoading={wordsLoading}
+      completedLessons={completedLessons}
+      streak={streak}
+      activity={activity}
+      currentLesson={currentLesson}
+      review={review}
+      onSend={(text) => sendMessage(text)}
+      onStartLesson={(lesson) => startConversation(lesson.prompt, lesson)}
+      onStartRegion={handleStartRegion}
+      onFinishLesson={handleFinishLesson}
+      onStartReview={startReview}
+      onRate={rateWord}
+      onCloseReview={() => setReview(null)}
+      onUpdateProfile={updateProfile}
+    />
   );
 }

@@ -2,23 +2,43 @@
 import { supabase } from "@/lib/supabase";
 import { themes, radius } from "@/lib/theme";
 
-export default function UserMenu({ user, wordCount, streak, theme }) {
+// On phones only the streak shows; email and sign out live in Settings.
+export default function UserMenu({ user, wordCount, streak, theme, compact = false }) {
   const t = themes[theme];
+
+  if (compact) {
+    return streak > 0 ? (
+      <Pill color={t.warning} bg={t.accentSoft} border={t.accentBorder}>
+        {streak}d streak
+      </Pill>
+    ) : null;
+  }
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
       {streak > 0 && (
-        <Pill t={t} color={t.warning} bg={t.accentSoft} border={t.accentBorder}>
+        <Pill color={t.warning} bg={t.accentSoft} border={t.accentBorder}>
           {streak} day streak
         </Pill>
       )}
       {wordCount > 0 && (
-        <Pill t={t} color={t.success} bg={t.successSoft} border={t.successBorder}>
+        <Pill color={t.success} bg={t.successSoft} border={t.successBorder}>
           {wordCount} words
         </Pill>
       )}
       <div style={{ width: "1px", height: "16px", background: t.border, margin: "0 2px" }} />
-      <span style={{ fontSize: "12.5px", color: t.textMuted }}>{user.email.split("@")[0]}</span>
+      <span
+        style={{
+          fontSize: "12.5px",
+          color: t.textMuted,
+          maxWidth: "140px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {user.email.split("@")[0]}
+      </span>
       <button
         onClick={() => supabase.auth.signOut()}
         style={{
@@ -50,6 +70,7 @@ function Pill({ children, color, bg, border }) {
         background: bg,
         border: `1px solid ${border}`,
         color,
+        whiteSpace: "nowrap",
       }}
     >
       {children}
