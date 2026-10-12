@@ -1,5 +1,7 @@
 # Ming 明 — Mandarin Coach
 
+[![tests](https://github.com/alex-wang55/ming/actions/workflows/tests.yml/badge.svg)](https://github.com/alex-wang55/ming/actions/workflows/tests.yml)
+
 An AI-powered Mandarin coach that learns your goal, builds a personalised plan, and teaches you through real conversations. Works in the browser on desktop and phone, and installs like an app on both.
 
 ## Features
@@ -39,6 +41,11 @@ An AI-powered Mandarin coach that learns your goal, builds a personalised plan, 
    ```bash
    npm run dev
    # http://localhost:3000
+   ```
+
+6. **Run tests**
+   ```bash
+   npm test
    ```
 
 ## Installing on a phone or computer
