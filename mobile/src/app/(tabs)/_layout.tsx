@@ -8,7 +8,8 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Learn</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="book" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="chat">
+      {/* Chat handles its own insets so the message box can sit above the tab bar. */}
+      <NativeTabs.Trigger name="chat" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Label>Chat</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="bubble.left.and.bubble.right" />
       </NativeTabs.Trigger>

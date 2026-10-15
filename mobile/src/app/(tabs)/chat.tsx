@@ -2,7 +2,8 @@ import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Pressable, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// The tab-aware SafeAreaView knows how tall the iOS tab bar is, so the input sits above it.
+import { SafeAreaView } from "react-native-screens/experimental";
 import { postJSON } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { useMingTheme } from "@/lib/theme";
@@ -78,14 +79,25 @@ export default function Chat() {
   const busy = sending || mic.state === "transcribing";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={{ top: true, bottom: true }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <FlatList
           ref={list}
           data={messages}
           keyExtractor={(_, i) => String(i)}
-          contentContainerStyle={{ padding: 16, gap: 12 }}
+          contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: true })}
+          keyboardDismissMode="interactive"
+          ListEmptyComponent={
+            // Same empty state as the web app's chat.
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
+              <Text style={{ fontSize: 44, color: t.accent, opacity: 0.15, marginBottom: 10 }}>明</Text>
+              <Text style={{ fontSize: 16, fontWeight: "500", color: t.textMuted, marginBottom: 6 }}>Ready when you are</Text>
+              <Text style={{ fontSize: 13, color: t.textMuted, textAlign: "center" }}>
+                Just start talking. Say hi in English or Mandarin, or tap the mic.
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
             <View
               style={{
