@@ -4,7 +4,7 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 export default function TabsLayout() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="learn">
+      <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Learn</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="book" />
       </NativeTabs.Trigger>
