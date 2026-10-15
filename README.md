@@ -58,6 +58,10 @@ Ming is a Progressive Web App, so there's nothing to download from an app store:
 
 Installation needs HTTPS, so it works on the deployed site (and on `localhost` for testing).
 
+## iOS app
+
+A native iOS app built with Expo lives in [`mobile/`](mobile/README.md). It shares this app's Supabase project and calls these same API routes, so the web app is its backend. See its README for setup and shipping to TestFlight.
+
 ## Cost and abuse controls
 
 - Every API route (`/api/chat`, `/api/tts`, `/api/transcribe`) requires a signed-in user's token.
@@ -70,12 +74,13 @@ Installation needs HTTPS, so it works on the deployed site (and on `localhost` f
 ```
 src/app/page.js            data loading, chat, reviews (top-level state)
 src/components/AppShell.js phone/desktop layout, tabs, search, review modal
-src/app/api/*              chat, tts, transcribe (all require auth)
+src/app/api/*              chat, tts, transcribe, account deletion (all require auth)
 src/lib/ai.js              system prompt + AI provider
 src/lib/review.js          spaced-repetition scheduling
 src/lib/settings.js        user preferences (saved in the browser)
 supabase/                  schema and migrations
 public/sw.js, manifest     app install + offline page
+mobile/                    native iOS app (Expo)
 ```
 
 ## Deploy to Vercel
