@@ -1,50 +1,83 @@
 import { AudioModule, RecordingPresets, createAudioPlayer, setAudioModeAsync, useAudioRecorder, type AudioPlayer } from "expo-audio";
 import { File, Paths } from "expo-file-system";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, postJSON } from "./api";
 
-const MAX_RECORDING_SECONDS = 60;
+// Same limits as the web ChatInput: a minute max, and anything under ~0.7s is a mis-tap.
+const MAX_RECORDING_MS = 60 * 1000;
+const MIN_RECORDING_MS = 700;
+
+export type MicState = "idle" | "starting" | "recording" | "transcribing";
 
 /* ---------- Speaking to Ming: record, then send to /api/transcribe (Whisper) ---------- */
 
-export function useMingRecorder() {
+export function useMingRecorder(onText: (text: string) => void, onError: (message: string) => void) {
   // HIGH_QUALITY records AAC in an .m4a, which Whisper accepts as-is.
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
+  const [state, setState] = useState<MicState>("idle");
+  const startedAt = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef<MicState>("idle");
+  const set = (s: MicState) => {
+    stateRef.current = s;
+    setState(s);
+  };
 
-  const start = useCallback(async () => {
-    const { granted } = await AudioModule.requestRecordingPermissionsAsync();
-    if (!granted) throw new Error("Microphone access is off. Turn it on in Settings > Ming.");
-    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
-    await recorder.prepareToRecordAsync();
-    recorder.record({ forDuration: MAX_RECORDING_SECONDS });
-    setState("recording");
-  }, [recorder]);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
 
-  const stopAndTranscribe = useCallback(async (): Promise<string> => {
-    await recorder.stop();
-    // Leaving recording mode on routes playback to the quiet earpiece on iPhone.
-    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
-    const uri = recorder.uri;
-    if (!uri) {
-      setState("idle");
-      return "";
-    }
-    setState("transcribing");
+  const stop = useCallback(async () => {
+    if (stateRef.current !== "recording") return;
+    if (timer.current) clearTimeout(timer.current);
+    set("transcribing");
     try {
+      await recorder.stop();
+      // Leaving recording mode on routes playback to the quiet earpiece on iPhone.
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      const uri = recorder.uri;
+      if (!uri || Date.now() - startedAt.current < MIN_RECORDING_MS) {
+        onError("That was too short. Tap the mic, speak, then tap again to send.");
+        return;
+      }
       const fd = new FormData();
       // React Native's FormData takes a { uri, name, type } file reference.
       fd.append("audio", { uri, name: "recording.m4a", type: "audio/m4a" } as unknown as Blob);
       const res = await apiFetch("/api/transcribe", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Couldn't understand that recording. Try again.");
-      return (data.text ?? "").trim();
+      const text = typeof data.text === "string" ? data.text.trim() : "";
+      if (res.ok && text) onText(text);
+      else onError(data.error ?? "Couldn't hear anything. Try again a little closer to the mic.");
+    } catch {
+      onError("Transcription failed. Check your connection and try again.");
     } finally {
-      setState("idle");
+      set("idle");
     }
-  }, [recorder]);
+  }, [recorder, onText, onError]);
 
-  return { state, start, stopAndTranscribe };
+  const start = useCallback(async () => {
+    if (stateRef.current !== "idle") return;
+    set("starting");
+    try {
+      const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+      if (!granted) {
+        set("idle");
+        onError("Microphone access is off. Turn it on in Settings > Ming to speak to Ming.");
+        return;
+      }
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      startedAt.current = Date.now();
+      set("recording");
+      timer.current = setTimeout(() => stop(), MAX_RECORDING_MS);
+    } catch {
+      set("idle");
+      onError("Couldn't start the microphone. Try again.");
+    }
+  }, [recorder, onError, stop]);
+
+  return { state, start, stop };
 }
 
 /* ---------- Ming speaking: /api/tts returns base64 MP3, cached on disk ---------- */
@@ -55,7 +88,7 @@ let current: { player: AudioPlayer; done: () => void } | null = null;
 function fileNameFor(text: string) {
   let h = 5381;
   for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
-  return `tts-${(h >>> 0).toString(36)}.mp3`;
+  return `tts-${(h >>> 0).toString(36)}-${text.length}.mp3`;
 }
 
 // Plays Mandarin audio for `text`. Resolves when playback ends or another clip interrupts it.
@@ -83,9 +116,13 @@ export async function speak(text: string) {
     current.done();
   }
 
+  await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
   await new Promise<void>((resolve) => {
     const player = createAudioPlayer({ uri });
+    let finished = false;
     const done = () => {
+      if (finished) return;
+      finished = true;
       sub.remove();
       if (current?.player === player) current = null;
       resolve();
@@ -102,6 +139,7 @@ export async function speak(text: string) {
 }
 
 // [playingText, play] for UI state, same shape as the web app's useSpeaker.
+// Use useSpeak() from the store in screens: it asks for AI consent first.
 export function useSpeaker() {
   const [playing, setPlaying] = useState<string | null>(null);
   const play = useCallback(async (text: string) => {

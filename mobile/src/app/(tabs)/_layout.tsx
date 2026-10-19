@@ -1,9 +1,13 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { useStore } from "@/lib/store";
+import { useMingTheme } from "@/lib/theme";
 
 // Real UITabBar on iOS (Liquid Glass on iOS 26), same five tabs as the web app's phone layout.
 export default function TabsLayout() {
+  const t = useMingTheme();
+  const { dueCount } = useStore();
   return (
-    <NativeTabs>
+    <NativeTabs tintColor={t.accent} badgeBackgroundColor={t.accent}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Learn</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="book" />
@@ -16,6 +20,8 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="words">
         <NativeTabs.Trigger.Label>Words</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="character.book.closed" />
+        {/* Same as the web nav: the number of words due for review */}
+        <NativeTabs.Trigger.Badge hidden={dueCount === 0}>{String(dueCount)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="map">
         <NativeTabs.Trigger.Label>Map</NativeTabs.Trigger.Label>

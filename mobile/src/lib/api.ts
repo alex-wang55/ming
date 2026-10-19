@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 
 // The Next.js app on Vercel stays the backend. Native apps don't hit CORS,
 // and every route already reads the Supabase token from the Authorization header.
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://ming-wine.vercel.app";
+export const WEB_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://ming-wine.vercel.app";
 
 export async function apiFetch(path: string, init: RequestInit = {}) {
   const {
@@ -10,7 +10,7 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   } = await supabase.auth.getSession();
   const headers = new Headers(init.headers);
   if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
-  return fetch(API_URL + path, { ...init, headers });
+  return fetch(WEB_URL + path, { ...init, headers });
 }
 
 export function postJSON(path: string, body: unknown) {
