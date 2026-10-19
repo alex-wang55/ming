@@ -5,11 +5,23 @@ import { ChinaMap } from "@/components/ChinaMap";
 import { ChevronIcon } from "@/components/icons";
 import { PrimaryButton, ScreenHeader } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
+import { useSession } from "@/lib/session";
 import { useStore } from "@/lib/store";
 import { cnFont, radius, serifFont, useMingTheme } from "@/lib/theme";
 import { REGIONS, REGION_TYPES } from "@/shared/regions";
 
 type Region = (typeof REGIONS)[number];
+
+// Open on the region your goal mentions ("...family in Shanghai this winter"), else Beijing,
+// so the screen isn't half empty before you've picked anything.
+const ALIASES: Record<string, string[]> = { taipei: ["taiwan", "台湾", "台灣"], xian: ["xian"], guangzhou: ["canton"] };
+function regionForGoal(goal: string | null | undefined): string {
+  const g = (goal ?? "").toLowerCase();
+  const hit = REGIONS.find(
+    (r: Region) => g.includes(r.name.toLowerCase()) || g.includes(r.chineseName) || (ALIASES[r.id] ?? []).some((a) => g.includes(a))
+  );
+  return hit?.id ?? REGIONS[0].id;
+}
 
 // Port of the web MapTab's phone layout: the parchment map on top, then the region's
 // accent, culture, tip, food and scenarios, then a button that starts a lesson there.
@@ -18,18 +30,27 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { startRegion } = useStore();
-  const [selected, setSelected] = useState<string | null>(null);
+  const { profile } = useSession();
+  const [selected, setSelected] = useState<string>(() => regionForGoal(profile?.goal_text));
   const scroll = useRef<ScrollView>(null);
   const detailY = useRef(0);
+  // Keep the selected chip in view when a region is picked on the map (or picked for you).
+  const chips = useRef<ScrollView>(null);
+  const chipX = useRef<Record<string, number>>({});
+  const showChip = useCallback((id: string, animated: boolean) => {
+    const x = chipX.current[id];
+    if (x !== undefined) chips.current?.scrollTo({ x: Math.max(x - 16, 0), animated });
+  }, []);
 
   const region: Region | undefined = REGIONS.find((r: Region) => r.id === selected);
 
   const select = useCallback((id: string) => {
     haptic.select();
     setSelected(id);
+    showChip(id, true);
     // Wait a frame so the detail panel has laid out, then bring it into view.
     setTimeout(() => scroll.current?.scrollTo({ y: Math.max(detailY.current - 8, 0), animated: true }), 60);
-  }, []);
+  }, [showChip]);
 
   const typeColors = (type: string) =>
     type === "mainland"
@@ -53,13 +74,17 @@ export default function MapScreen() {
       </View>
 
       {/* Bigger targets than the map for small regions like Shanghai */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
+      <ScrollView ref={chips} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
         {REGIONS.map((r: Region) => {
           const on = r.id === selected;
           return (
             <Pressable
               key={r.id}
               onPress={() => select(r.id)}
+              onLayout={(e) => {
+                chipX.current[r.id] = e.nativeEvent.layout.x;
+                if (on) showChip(r.id, false);
+              }}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               style={{

@@ -1,7 +1,8 @@
+import { router } from "expo-router";
 import { Fragment, useState } from "react";
 import { Platform, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CourseProgress, DeadlineCard, LessonRow, lessonState, ProgressStrip, StreakCalendar, WordOfTheDay } from "@/components/learn";
+import { CourseProgress, DeadlineCard, LessonRow, lessonState, NextLessonCard, ProgressStrip, StreakCalendar, WordOfTheDay } from "@/components/learn";
 import { ToneReference } from "@/components/tones";
 import { Card, ScreenHeader } from "@/components/ui";
 import { useSession } from "@/lib/session";
@@ -15,9 +16,10 @@ export default function Learn() {
   const t = useMingTheme();
   const insets = useSafeAreaInsets();
   const { profile } = useSession();
-  const { completedLessons, streak, dueCount, activity, words, startLesson, startReview, refresh } = useStore();
+  const { completedLessons, streak, dueCount, activity, words, currentLesson, startLesson, startReview, refresh } = useStore();
   const [playing, play] = useSpeak();
   const [refreshing, setRefreshing] = useState(false);
+  const resumeChat = () => router.navigate("/chat");
 
   // Beginners see the tone guide first; once the tones lesson is done it moves below the path.
   const tonesDone = completedLessons.includes("tones");
@@ -48,6 +50,7 @@ export default function Learn() {
       <ScreenHeader title="Your lesson path" subtitle={`${completedLessons.length} of ${TOTAL_LESSONS} lessons complete`} />
 
       <View style={{ paddingHorizontal: 16, gap: 20 }}>
+        <NextLessonCard completedLessons={completedLessons} currentLessonId={currentLesson?.id ?? null} onStart={startLesson} onResume={resumeChat} />
         <ProgressStrip completedLessons={completedLessons} streak={streak} dueCount={dueCount} onReview={startReview} />
         {!tonesDone && toneGuide}
 
@@ -81,7 +84,13 @@ export default function Learn() {
                         }}
                       />
                     )}
-                    <LessonRow lesson={lesson} state={state} onPress={() => startLesson(lesson)} />
+                    <LessonRow
+                      lesson={lesson}
+                      state={state}
+                      inProgress={currentLesson?.id === lesson.id}
+                      // Tapping the lesson you're already in goes back to it instead of restarting it.
+                      onPress={() => (currentLesson?.id === lesson.id ? resumeChat() : startLesson(lesson))}
+                    />
                   </Fragment>
                 );
               })}

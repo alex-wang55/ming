@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { useStore } from "@/lib/store";
 import { cnFont, radius, useMingTheme } from "@/lib/theme";
 
 // Shared building blocks, styled after the web app's components.
 
 export function ScreenHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
   const t = useMingTheme();
-  const { streak } = useStore();
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}>
       <View
@@ -34,7 +32,7 @@ export function ScreenHeader({ title, subtitle, right }: { title: string; subtit
           </Text>
         ) : null}
       </View>
-      {right ?? (streak > 0 ? <Pill color={t.warning} bg={t.accentSoft} border={t.accentBorder}>{`${streak}d streak`}</Pill> : null)}
+      {right}
     </View>
   );
 }

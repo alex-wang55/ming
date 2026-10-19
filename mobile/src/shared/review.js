@@ -23,7 +23,7 @@ export function nextReview(word, rating, now = Date.now()) {
 export function describeNextReview(word, now = Date.now()) {
   const ms = new Date(word.next_review).getTime() - now;
   if (ms <= 0) return "Due now";
-  if (ms < DAY) return "Due today";
+  if (ms < DAY) return "Later today"; // not in the "Due" count yet, so don't call it due
   const days = Math.round(ms / DAY);
   return days === 1 ? "Tomorrow" : `In ${days} days`;
 }

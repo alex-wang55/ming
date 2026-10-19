@@ -45,7 +45,7 @@ describe("nextReview", () => {
 describe("describeNextReview", () => {
   it("labels past, same-day, and future reviews", () => {
     expect(describeNextReview({ next_review: iso(now - MINUTE) }, now)).toBe("Due now");
-    expect(describeNextReview({ next_review: iso(now + 3 * 60 * MINUTE) }, now)).toBe("Due today");
+    expect(describeNextReview({ next_review: iso(now + 3 * 60 * MINUTE) }, now)).toBe("Later today");
     expect(describeNextReview({ next_review: iso(now + DAY) }, now)).toBe("Tomorrow");
     expect(describeNextReview({ next_review: iso(now + 5 * DAY) }, now)).toBe("In 5 days");
   });

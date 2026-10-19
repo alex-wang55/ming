@@ -7,6 +7,75 @@ import { LESSONS } from "@/shared/lessons";
 import { CheckIcon, ChevronIcon, DotIcon, LockIcon, SpeakerIcon } from "./icons";
 import { Card, Label } from "./ui";
 
+/* ---------- NextLessonCard: the one thing to tap when you open the app ---------- */
+
+const ALL_LESSONS = LESSONS.flatMap((w) => w.lessons);
+
+export function NextLessonCard({
+  completedLessons,
+  currentLessonId,
+  onStart,
+  onResume,
+}: {
+  completedLessons: string[];
+  currentLessonId: string | null;
+  onStart: (lesson: Lesson) => void;
+  onResume: () => void;
+}) {
+  const t = useMingTheme();
+  const index = ALL_LESSONS.findIndex((l) => !completedLessons.includes(l.id));
+  const lesson = index === -1 ? null : ALL_LESSONS[index];
+  // Already in the middle of it: go back to that chat instead of starting it over.
+  const inProgress = !!lesson && lesson.id === currentLessonId;
+
+  const label = lesson ? `${inProgress ? "In progress" : "Up next"} · Lesson ${index + 1} of ${TOTAL_LESSONS}` : "Course complete";
+  const title = lesson ? lesson.title : `You finished all ${TOTAL_LESSONS} lessons`;
+  const sub = lesson ? lesson.sub : "Keep practicing with Ming, or start a lesson in a new region from the Map tab.";
+  const action = lesson ? (inProgress ? "Continue" : "Start lesson") : "Chat with Ming";
+
+  return (
+    <Pressable
+      onPress={() => (lesson && !inProgress ? onStart(lesson) : onResume())}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${title}. ${action}`}
+      style={({ pressed }) => ({
+        backgroundColor: t.accent,
+        borderRadius: radius.lg,
+        padding: 18,
+        overflow: "hidden",
+        opacity: pressed ? 0.85 : 1,
+        transform: [{ scale: pressed ? 0.99 : 1 }],
+      })}
+    >
+      <Text style={{ fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", color: t.btnText, opacity: 0.75, marginBottom: 6 }}>
+        {label}
+      </Text>
+      <Text style={{ fontSize: 22, fontWeight: "700", color: t.btnText, letterSpacing: -0.3, marginBottom: 3, marginRight: 40 }}>{title}</Text>
+      <Text style={{ fontSize: 14, color: t.btnText, opacity: 0.85, lineHeight: 20, marginBottom: 16, marginRight: 40 }}>{sub}</Text>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          alignSelf: "flex-start",
+          gap: 6,
+          backgroundColor: t.btnText,
+          borderRadius: radius.full,
+          paddingVertical: 9,
+          paddingHorizontal: 16,
+        }}
+      >
+        <Text style={{ fontSize: 15, fontWeight: "600", color: t.accent }}>{action}</Text>
+        <ChevronIcon color={t.accent} />
+      </View>
+      <Text
+        style={{ position: "absolute", right: -6, bottom: -18, fontFamily: cnFont, fontSize: 96, color: t.btnText, opacity: 0.1, pointerEvents: "none" }}
+      >
+        学
+      </Text>
+    </Pressable>
+  );
+}
+
 /* ---------- ProgressStrip: this week's lessons, streak, words to review ---------- */
 
 export function ProgressStrip({
@@ -29,8 +98,9 @@ export function ProgressStrip({
     <Card style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 12 }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 7 }}>
+          {/* Just "Week 1": the full title is in the path below and gets cut off here. */}
           <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, color: t.text, fontWeight: "500" }}>
-            {week.weekTitle}
+            {`Week ${week.week}`}
           </Text>
           <Text style={{ fontSize: 12, color: t.accent, fontWeight: "600" }}>
             {done} / {week.lessons.length}
@@ -86,16 +156,16 @@ export type LessonState = "done" | "active" | "locked";
 
 export function lessonState(completedLessons: string[], lessonId: string): LessonState {
   if (completedLessons.includes(lessonId)) return "done";
-  const firstOpen = LESSONS.flatMap((w) => w.lessons).find((l) => !completedLessons.includes(l.id));
+  const firstOpen = ALL_LESSONS.find((l) => !completedLessons.includes(l.id));
   return firstOpen?.id === lessonId ? "active" : "locked";
 }
 
-export function LessonRow({ lesson, state, onPress }: { lesson: Lesson; state: LessonState; onPress: () => void }) {
+export function LessonRow({ lesson, state, inProgress, onPress }: { lesson: Lesson; state: LessonState; inProgress?: boolean; onPress: () => void }) {
   const t = useMingTheme();
   const done = state === "done";
   const active = state === "active";
   const locked = state === "locked";
-  const iconColor = done ? t.success : active ? t.accent : t.textFaint;
+  const iconColor = done ? t.success : active ? t.accent : t.textMuted;
 
   return (
     <Pressable
@@ -112,10 +182,11 @@ export function LessonRow({ lesson, state, onPress }: { lesson: Lesson; state: L
         flexDirection: "row",
         alignItems: "center",
         gap: 13,
-        backgroundColor: active ? t.accentSoft : t.surface,
+        // Locked rows are dimmed and flat (no card background) but still readable.
+        backgroundColor: active ? t.accentSoft : locked ? "transparent" : t.surface,
         borderWidth: 1,
         borderColor: done ? t.successBorder : active ? t.accentBorder : t.border,
-        opacity: locked ? 0.42 : pressed ? 0.75 : 1,
+        opacity: locked ? 0.7 : pressed ? 0.75 : 1,
       })}
     >
       <View
@@ -133,7 +204,7 @@ export function LessonRow({ lesson, state, onPress }: { lesson: Lesson; state: L
         {done ? <CheckIcon color={iconColor} /> : locked ? <LockIcon color={iconColor} /> : <DotIcon color={iconColor} />}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, fontWeight: "500", marginBottom: 2, color: done ? t.success : active ? t.accent : locked ? t.textFaint : t.text }}>
+        <Text style={{ fontSize: 15, fontWeight: "500", marginBottom: 2, color: done ? t.success : active ? t.accent : locked ? t.textSecondary : t.text }}>
           {lesson.title}
         </Text>
         <Text numberOfLines={1} style={{ fontSize: 12.5, color: t.textMuted }}>
@@ -142,7 +213,7 @@ export function LessonRow({ lesson, state, onPress }: { lesson: Lesson; state: L
       </View>
       {active && (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Text style={{ fontSize: 12.5, fontWeight: "600", color: t.accent }}>Continue</Text>
+          <Text style={{ fontSize: 12.5, fontWeight: "600", color: t.accent }}>{inProgress ? "Continue" : "Start"}</Text>
           <ChevronIcon color={t.accent} />
         </View>
       )}
