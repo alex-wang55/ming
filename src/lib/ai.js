@@ -1,5 +1,6 @@
 // lib/ai.js
-// Auto-detects which API key is in .env.local and uses that provider.
+// Auto-detects which API key is in .env.local and uses that provider
+// (GROQ_API_KEY first if set, then ANTHROPIC_API_KEY, then OPENAI_API_KEY).
 // Uses cheap/mini-tier models by default to keep per-message cost tiny.
 
 import OpenAI from "openai";
@@ -62,8 +63,34 @@ Otherwise, when a user first messages you, run this flow — one question at a t
 // Keep responses tight — shorter replies cost less and read better in a chat UI anyway.
 const MAX_TOKENS = 600;
 
+// Groq: a free option (no card needed) for testing. While GROQ_API_KEY is set it handles
+// both chat and voice; remove the key to go back to Anthropic/OpenAI. Its API is
+// OpenAI-compatible, so it reuses the OpenAI SDK with a different base URL.
+const GROQ_BASE_URL = process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1";
+const GROQ_CHAT_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+const GROQ_WHISPER_MODEL = "whisper-large-v3";
+
+function groq() {
+  return new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: GROQ_BASE_URL });
+}
+
 export async function getAIResponse(messages, learnerContext = "") {
   const systemWithContext = MING_SYSTEM_PROMPT + learnerContext;
+
+  if (process.env.GROQ_API_KEY) {
+    const response = await groq().chat.completions.create({
+      model: GROQ_CHAT_MODEL,
+      // gpt-oss thinks before it answers. Keep that short and out of the reply, and leave
+      // room for it, since thinking can use up the token budget before the answer starts.
+      reasoning_effort: "low",
+      include_reasoning: false,
+      max_completion_tokens: 2000,
+      messages: [{ role: "system", content: systemWithContext }, ...messages],
+    });
+    const text = response.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error(`Groq returned no reply (finish_reason: ${response.choices?.[0]?.finish_reason})`);
+    return text;
+  }
 
   if (process.env.ANTHROPIC_API_KEY) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -86,5 +113,17 @@ export async function getAIResponse(messages, learnerContext = "") {
     return response.choices[0].message.content;
   }
 
-  throw new Error("No API key found. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to your .env.local file.");
+  throw new Error("No API key found. Add GROQ_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY to your .env.local file.");
+}
+
+// Speech to text with Whisper: Groq's whisper-large-v3 while GROQ_API_KEY is set, else OpenAI.
+export async function transcribeAudio(file) {
+  const useGroq = !!process.env.GROQ_API_KEY;
+  const client = useGroq ? groq() : new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const transcription = await client.audio.transcriptions.create({
+    file,
+    model: useGroq ? GROQ_WHISPER_MODEL : "whisper-1",
+    language: "zh", // hint that it's likely Chinese — improves accuracy
+  });
+  return transcription.text;
 }

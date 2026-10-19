@@ -27,6 +27,7 @@ An AI-powered Mandarin coach that learns your goal, builds a personalised plan, 
    | --- | --- |
    | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` | Chat (whichever is set; see `src/lib/ai.js`) |
    | `OPENAI_API_KEY` | Voice input (Whisper) |
+   | `GROQ_API_KEY` (optional) | Free testing mode: while set, Groq handles chat (`openai/gpt-oss-120b`) and voice (`whisper-large-v3`) instead |
    | `GOOGLE_TTS_API_KEY` | Pronunciation audio |
    | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Auth and data (browser) |
    | `SUPABASE_SERVICE_KEY` | API routes (server only — never expose this) |
