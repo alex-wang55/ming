@@ -3,6 +3,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { PrimaryButton } from "@/components/ui";
 import { SessionProvider, useSession } from "@/lib/session";
 import { SettingsProvider, useSettings } from "@/lib/settings";
@@ -85,12 +86,15 @@ function RootStack() {
 
 export default function RootLayout() {
   return (
-    <SettingsProvider>
-      <SessionProvider>
-        <StoreProvider>
-          <RootStack />
-        </StoreProvider>
-      </SessionProvider>
-    </SettingsProvider>
+    // KeyboardProvider tracks the keyboard frame by frame, so Chat can keep its box above it.
+    <KeyboardProvider>
+      <SettingsProvider>
+        <SessionProvider>
+          <StoreProvider>
+            <RootStack />
+          </StoreProvider>
+        </SessionProvider>
+      </SettingsProvider>
+    </KeyboardProvider>
   );
 }

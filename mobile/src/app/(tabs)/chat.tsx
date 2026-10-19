@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { useKeyboardHandler } from "react-native-keyboard-controller";
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 // The tab-aware SafeAreaView knows how tall the iOS tab bar is, so the input sits above it.
 import { SafeAreaView } from "react-native-screens/experimental";
 import { ArrowUpIcon, MicIcon, StopIcon } from "@/components/icons";
@@ -32,6 +34,33 @@ export default function Chat() {
   const welcome = useMemo(() => welcomeFor(profile), [profile]);
   const data = useMemo(() => [welcome, ...messages], [welcome, messages]);
 
+  // Keep the message box right on top of the keyboard. The keyboard's height is measured
+  // from the bottom of the screen, but this screen already sits above the tab bar, so only
+  // lift by the part of the keyboard that overlaps it. `gap` is measured on screen (not from
+  // the layout tree), so it stays right whatever the tab bar and safe areas are doing.
+  const { height: windowHeight } = useWindowDimensions();
+  const body = useRef<View>(null);
+  const keyboard = useSharedValue(0);
+  const gap = useSharedValue(0);
+  useKeyboardHandler(
+    {
+      onMove: (e) => {
+        "worklet";
+        keyboard.value = e.height;
+      },
+      onEnd: (e) => {
+        "worklet";
+        keyboard.value = e.height;
+      },
+    },
+    []
+  );
+  const lift = useAnimatedStyle(() => ({ height: Math.max(keyboard.value - gap.value, 0) }));
+  const measureGap = () =>
+    body.current?.measureInWindow((_x, y, _w, h) => {
+      if (h > 0) gap.value = Math.max(windowHeight - (y + h), 0);
+    });
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={{ top: true, bottom: true }}>
       <ScreenHeader
@@ -39,13 +68,15 @@ export default function Chat() {
         subtitle={currentLesson ? currentLesson.sub : "Free conversation"}
       />
       <View style={{ height: 1, backgroundColor: t.border }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View ref={body} style={{ flex: 1 }} onLayout={measureGap}>
         <FlatList
           ref={list}
           data={data}
           keyExtractor={(_, i) => String(i)}
           contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 16, gap: 16, flexGrow: 1 }}
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: messages.length > 0 })}
+          // When the keyboard opens the list gets shorter; keep the latest message in view.
+          onLayout={() => list.current?.scrollToEnd({ animated: false })}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => <MessageBubble message={item} playing={playing} onPlay={play} />}
@@ -106,7 +137,8 @@ export default function Chat() {
           )}
           <ChatInput onSend={sendMessage} disabled={sending} usageLeft={usageLeft} />
         </View>
-      </KeyboardAvoidingView>
+        <Animated.View style={lift} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -171,7 +203,7 @@ function ChatInput({ onSend, disabled, usageLeft }: { onSend: (text: string) => 
           editable={!busy && !recording}
           multiline
           accessibilityLabel="Message Ming"
-          placeholder={mic.state === "transcribing" ? "Transcribing your audio..." : recording ? "Listening... tap stop to send" : "Message Ming"}
+          placeholder={mic.state === "transcribing" ? "Transcribing your audio..." : recording ? "Listening... tap stop to send" : "Message Ming (pinyin is fine)"}
           placeholderTextColor={t.textMuted}
           style={{ flex: 1, color: t.text, fontSize: 16, lineHeight: 21, maxHeight: 140, paddingTop: 8, paddingBottom: 8 }}
         />
