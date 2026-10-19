@@ -1,5 +1,6 @@
 import { getAIResponse } from "@/lib/ai";
 import { getAdmin, getUser, jsonError, SIGN_IN_AGAIN } from "@/lib/server";
+import { chineseLevelLine } from "@/lib/level";
 import { parseToneTags } from "@/lib/tags";
 
 // Hard daily cap per user, so worst-case AI spend is bounded.
@@ -91,7 +92,7 @@ export async function POST(request) {
 }
 
 async function buildContext(db, userId, preferences = {}) {
-  const [{ data: profile }, { data: dueWords }] = await Promise.all([
+  const [{ data: profile }, { data: dueWords }, { count: lessonsDone }, { count: wordCount }] = await Promise.all([
     db.from("profiles").select("goal_text, deadline_date").eq("id", userId).maybeSingle(),
     db
       .from("words")
@@ -100,6 +101,9 @@ async function buildContext(db, userId, preferences = {}) {
       .lte("next_review", new Date().toISOString())
       .order("next_review", { ascending: true })
       .limit(5),
+    // Counts only (no rows), to decide how much Chinese Ming should use.
+    db.from("lesson_progress").select("*", { count: "exact", head: true }).eq("user_id", userId),
+    db.from("words").select("*", { count: "exact", head: true }).eq("user_id", userId),
   ]);
 
   const lines = [];
@@ -112,6 +116,7 @@ async function buildContext(db, userId, preferences = {}) {
         : `Their deadline (${profile.deadline_date}) has passed. Keep building on what they learned.`
     );
   }
+  lines.push(chineseLevelLine(lessonsDone || 0, wordCount || 0));
   if (PINYIN_PREFS[preferences.pinyin]) lines.push(PINYIN_PREFS[preferences.pinyin]);
   if (PACE_PREFS[preferences.pace]) lines.push(PACE_PREFS[preferences.pace]);
   if (dueWords?.length) {

@@ -41,14 +41,17 @@ export function useMingRecorder(onText: (text: string) => void, onError: (messag
         return;
       }
       const fd = new FormData();
-      // React Native's FormData takes a { uri, name, type } file reference.
-      fd.append("audio", { uri, name: "recording.m4a", type: "audio/m4a" } as unknown as Blob);
+      // Expo's fetch (the default since SDK 52) can't upload the old React Native
+      // { uri, name, type } objects; it throws before sending anything. It does take an
+      // expo-file-system File, which it reads and sends as recording-xxxx.m4a.
+      fd.append("audio", new File(uri) as unknown as Blob);
       const res = await apiFetch("/api/transcribe", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       const text = typeof data.text === "string" ? data.text.trim() : "";
       if (res.ok && text) onText(text);
       else onError(data.error ?? "Couldn't hear anything. Try again a little closer to the mic.");
-    } catch {
+    } catch (e) {
+      console.warn("Voice message failed:", e); // shows in the npx expo start terminal
       onError("Transcription failed. Check your connection and try again.");
     } finally {
       set("idle");

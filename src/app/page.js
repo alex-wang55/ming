@@ -247,7 +247,7 @@ export default function Home() {
 
   function handleStartRegion(region) {
     startConversation(
-      `I want to focus on ${region.name} (${region.chineseName}). Teach me the language, accent, and culture specific to this region.`,
+      `I want to focus on ${region.name} (${region.chineseName}). Tell me about the accent and culture there, and teach me a few useful local phrases.`,
       null
     );
   }
