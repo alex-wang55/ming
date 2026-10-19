@@ -1,13 +1,15 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, FlatList, Pressable, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 // The tab-aware SafeAreaView knows how tall the iOS tab bar is, so the input sits above it.
 import { SafeAreaView } from "react-native-screens/experimental";
 import { ArrowUpIcon, MicIcon, StopIcon } from "@/components/icons";
-import { MessageBubble, TypingIndicator } from "@/components/Message";
+import { MessageBubble, TypingIndicator, type WordTap } from "@/components/Message";
+import { PinyinBubble, type PinyinHint } from "@/components/PinyinBubble";
 import { ScreenHeader } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
+import { toPinyin } from "@/lib/pinyin";
 import { useSession, type Profile } from "@/lib/session";
 import { useSpeak, useStore, type Msg } from "@/lib/store";
 import { cnFont, radius, useMingTheme } from "@/lib/theme";
@@ -56,10 +58,26 @@ export default function Chat() {
     []
   );
   const lift = useAnimatedStyle(() => ({ height: Math.max(keyboard.value - gap.value, 0) }));
+  const bodyOrigin = useRef({ x: 0, y: 0 });
   const measureGap = () =>
-    body.current?.measureInWindow((_x, y, _w, h) => {
+    body.current?.measureInWindow((x, y, _w, h) => {
+      bodyOrigin.current = { x, y };
       if (h > 0) gap.value = Math.max(windowHeight - (y + h), 0);
     });
+
+  // Tapping Chinese plays it and shows its pinyin in a bubble just above the word. It stays
+  // until you tap or scroll somewhere else, or a new message comes in.
+  const [hint, setHint] = useState<(PinyinHint & { forCount: number }) | null>(null);
+  const onWord: WordTap = useCallback(
+    (text, at) => {
+      const { x, y } = bodyOrigin.current;
+      setHint({ id: Date.now(), text, x: at.x - x, top: at.top - y, bottom: at.bottom - y, forCount: messages.length });
+      AccessibilityInfo.announceForAccessibility(toPinyin(text));
+    },
+    [messages.length]
+  );
+  const clearHint = () => setHint(null);
+  const showHint = hint && hint.forCount === messages.length ? hint : null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={{ top: true, bottom: true }}>
@@ -79,7 +97,10 @@ export default function Chat() {
           onLayout={() => list.current?.scrollToEnd({ animated: false })}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => <MessageBubble message={item} playing={playing} onPlay={play} />}
+          // Any new touch clears the pinyin bubble; tapping another word shows that one instead.
+          onTouchStart={clearHint}
+          onScrollBeginDrag={clearHint}
+          renderItem={({ item }) => <MessageBubble message={item} playing={playing} onPlay={play} onWord={onWord} />}
           ListFooterComponent={
             sending ? (
               <TypingIndicator />
@@ -94,7 +115,10 @@ export default function Chat() {
           }
         />
 
-        <View style={{ borderTopWidth: 1, borderTopColor: t.border, backgroundColor: t.bg, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, gap: 8 }}>
+        <View
+          onTouchStart={clearHint}
+          style={{ borderTopWidth: 1, borderTopColor: t.border, backgroundColor: t.bg, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, gap: 8 }}
+        >
           {currentLesson && (
             <View
               style={{
@@ -138,6 +162,7 @@ export default function Chat() {
           <ChatInput onSend={sendMessage} disabled={sending} usageLeft={usageLeft} />
         </View>
         <Animated.View style={lift} />
+        {showHint && <PinyinBubble key={showHint.id} hint={showHint} />}
       </View>
     </SafeAreaView>
   );

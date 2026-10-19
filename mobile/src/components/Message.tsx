@@ -8,11 +8,17 @@ import { ToneGraphs } from "./tones";
 const HANZI_RUN = /([一-鿿㐀-䶿]+)/g;
 const HAS_HANZI = /[一-鿿㐀-䶿]/;
 
-type Props = { message: Msg; playing: string | null; onPlay: (text: string) => void };
+// Called when Chinese text is tapped, with where it is on screen (the finger's x, and the
+// top/bottom of the line it's on), so the chat can show that word's pinyin just above it.
+export type WordTap = (text: string, at: { x: number; top: number; bottom: number }) => void;
+
+const LINE = 24; // lineHeight of message text; used to find the top of the tapped line
+
+type Props = { message: Msg; playing: string | null; onPlay: (text: string) => void; onWord?: WordTap };
 
 // Port of the web Message.js: Ming on the left with the 明 avatar, you on the right.
 // Chinese in Ming's replies is tappable to hear it, and new words get a card with tone contours.
-export function MessageBubble({ message, playing, onPlay }: Props) {
+export function MessageBubble({ message, playing, onPlay, onWord }: Props) {
   const t = useMingTheme();
   const isAI = message.role === "assistant";
 
@@ -35,7 +41,7 @@ export function MessageBubble({ message, playing, onPlay }: Props) {
           flexShrink: 1,
         }}
       >
-        <Content content={message.content} muted={!!message.error} tappable={!message.error} playing={playing} onPlay={onPlay} />
+        <Content content={message.content} muted={!!message.error} tappable={!message.error} playing={playing} onPlay={onPlay} onWord={onWord} />
       </View>
     </View>
   );
@@ -68,12 +74,14 @@ function Content({
   tappable,
   playing,
   onPlay,
+  onWord,
 }: {
   content: string;
   muted: boolean;
   tappable: boolean;
   playing: string | null;
   onPlay: (text: string) => void;
+  onWord?: WordTap;
 }) {
   const t = useMingTheme();
   const tags = tappable ? parseToneTags(content) : [];
@@ -89,9 +97,16 @@ function Content({
       tappable && HAS_HANZI.test(part) ? (
         <Text
           key={j}
-          onPress={() => onPlay(part)}
+          onPress={(e) => {
+            const { pageX, pageY, locationY } = e.nativeEvent;
+            // locationY is measured from the top of the whole message text, and every line is
+            // LINE tall, so this is how far down its line the finger was.
+            const into = Number.isFinite(locationY) ? ((locationY % LINE) + LINE) % LINE : LINE / 2;
+            onWord?.(part, { x: pageX, top: pageY - into, bottom: pageY - into + LINE });
+            onPlay(part);
+          }}
           accessibilityRole="button"
-          accessibilityHint="Plays the pronunciation"
+          accessibilityHint="Shows the pinyin and plays the pronunciation"
           style={{
             fontFamily: cnFont,
             fontSize: 17,
@@ -112,7 +127,7 @@ function Content({
 
   return (
     <View>
-      <Text selectable={!tappable} style={{ fontSize: 15.5, lineHeight: 24, color: muted ? t.textSecondary : t.text }}>
+      <Text selectable={!tappable} style={{ fontSize: 15.5, lineHeight: LINE, color: muted ? t.textSecondary : t.text }}>
         {text.split(/(\*\*[^*\n]+\*\*)/g).map((segment, i) => {
           const bold = segment.length > 4 && segment.startsWith("**") && segment.endsWith("**");
           const inner = bold ? segment.slice(2, -2) : segment;
