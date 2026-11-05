@@ -24,3 +24,36 @@ export function jsonError(message, status, extra = {}) {
 }
 
 export const SIGN_IN_AGAIN = "Your session expired. Please sign in again.";
+
+// Daily caps per user, so worst-case provider spend is bounded. Reset at midnight UTC.
+export const DAILY_LIMITS = { message: 30, tts: 300, transcribe: 60 };
+
+let quotaMissingLogged = false;
+
+// Atomically takes one unit of today's quota (see supabase/migrations/20261103_atomic_usage_caps.sql).
+// Returns { allowed, used }. Pass amount = -1 to give a unit back when the provider fails.
+export async function consumeQuota(userId, kind, amount = 1) {
+  const limit = DAILY_LIMITS[kind];
+  const { data, error } = await getAdmin().rpc("consume_daily_quota", {
+    p_user_id: userId,
+    p_kind: kind,
+    p_limit: limit,
+    p_amount: amount,
+  });
+  if (error) {
+    // Migration not run yet: don't take the app down, but say so loudly.
+    if (error.code === "PGRST202") {
+      if (!quotaMissingLogged) {
+        console.error("consume_daily_quota() is missing: run supabase/migrations/20261103_atomic_usage_caps.sql. Daily caps are OFF until then.");
+        quotaMissingLogged = true;
+      }
+      return { allowed: true, used: null };
+    }
+    throw error;
+  }
+  return { allowed: data !== null, used: data };
+}
+
+export function refundQuota(userId, kind) {
+  return consumeQuota(userId, kind, -1).catch((err) => console.error(`Refunding ${kind} quota failed:`, err));
+}

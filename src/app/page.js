@@ -6,6 +6,7 @@ import { speak } from "@/lib/audio";
 import { useSettings } from "@/lib/settings";
 import { localDateKey } from "@/lib/dates";
 import { isDue, nextReview } from "@/lib/review";
+import { computeStreak, STREAK_HISTORY_DAYS } from "@/lib/streak";
 import { parseToneTags } from "@/lib/tags";
 import Auth from "@/components/Auth";
 import GoalSetup from "@/components/GoalSetup";
@@ -127,38 +128,17 @@ export default function Home() {
     setCompletedLessons(data ? data.map((d) => d.lesson_id) : []);
   }
 
-  // Streak with a 1-day-per-week freeze so a single missed day doesn't reset it.
   async function loadActivity(uid) {
     const { data } = await supabase
       .from("daily_activity")
       .select("activity_date, session_count")
       .eq("user_id", uid)
       .order("activity_date", { ascending: false })
-      .limit(90);
+      .limit(STREAK_HISTORY_DAYS);
 
     const rows = (data || []).map((d) => ({ date: d.activity_date, count: d.session_count }));
     setActivity(rows);
-
-    const dates = new Set(rows.map((r) => r.date));
-    let count = 0;
-    let freezeUsed = false;
-    let daysSinceFreeze = 0;
-    const cursor = new Date();
-    if (!dates.has(localDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
-
-    for (let i = 0; i < 400; i++) {
-      if (dates.has(localDateKey(cursor))) {
-        count++;
-        daysSinceFreeze++;
-      } else if (!freezeUsed && daysSinceFreeze < 7) {
-        freezeUsed = true;
-        daysSinceFreeze = 0;
-      } else {
-        break;
-      }
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    setStreak(count);
+    setStreak(computeStreak(rows));
   }
 
   async function recordActivity() {

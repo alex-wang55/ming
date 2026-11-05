@@ -36,7 +36,7 @@ Every tab from the web app's phone layout, ported screen by screen:
 - `src/lib/session.tsx`, `settings.tsx`, `theme.ts`: auth + profile, saved preferences, the web palette.
 - `src/lib/voice.ts`: recording with expo-audio and uploading to Whisper, and TTS playback cached on disk.
 - `src/components/`: shared UI (message bubbles, tone graphs, lesson rows, the map, icons).
-- `src/shared/`: copied unchanged from the web app's `src/lib` (tags, review, lessons, regions, dates, theme), plus `streak.js` (the streak rule from `page.js`). Keep them in sync until they move to a shared package.
+- `src/shared/`: copied unchanged from the web app's `src/lib` (tags, review, lessons, regions, dates, theme, streak). Keep them in sync until they move to a shared package.
 
 ## Still to do
 
