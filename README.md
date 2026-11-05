@@ -34,7 +34,7 @@ An AI-powered Mandarin coach that learns your goal, builds a personalised plan, 
 
 3. **Database** — in the Supabase SQL editor:
    - New project: run `supabase/schema.sql`
-   - Existing project: run the files in `supabase/migrations/` in order
+   - Existing project: run the files in `supabase/migrations/` in order (any you haven't run yet)
 
 4. **Supabase Auth settings** — set the Site URL to your deployed URL and add it (plus `http://localhost:3000`) to Redirect URLs, so confirmation and password-reset emails link back to the app.
 
@@ -66,7 +66,7 @@ A native iOS app built with Expo lives in [`mobile/`](mobile/README.md). It shar
 ## Cost and abuse controls
 
 - Every API route (`/api/chat`, `/api/tts`, `/api/transcribe`) requires a signed-in user's token.
-- Chat is capped at 30 messages per user per day (`DAILY_MESSAGE_LIMIT` in `src/app/api/chat/route.js`), enforced server-side. Users can read but not modify their usage row.
+- Daily caps per user, enforced server-side: 30 chat messages, 300 audio clips and 60 voice messages (`DAILY_LIMITS` in `src/lib/server.js`). The database function `consume_daily_quota` checks and counts in one atomic step, so parallel requests can't slip past a cap, and a request the provider fails on isn't counted. Users can read but not modify their usage row, and can't call the function.
 - Only the last 20 messages are sent to the model, and replies are capped at 600 tokens, so cost per message stays flat.
 - Cheap model tiers by default (`claude-haiku-4-5` / `gpt-4o-mini`) — change in `src/lib/ai.js`.
 

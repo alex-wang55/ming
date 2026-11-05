@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { LESSONS } from "@/shared/lessons";
 import { localDateKey } from "@/shared/dates";
 import { isDue, nextReview } from "@/shared/review";
-import { computeStreak } from "@/shared/streak";
+import { computeStreak, STREAK_HISTORY_DAYS } from "@/shared/streak";
 import { parseToneTags } from "@/shared/tags";
 import { postJSON } from "./api";
 import { haptic } from "./haptics";
@@ -132,7 +132,7 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
       .select("activity_date, session_count")
       .eq("user_id", uid)
       .order("activity_date", { ascending: false })
-      .limit(90);
+      .limit(STREAK_HISTORY_DAYS);
     const rows = (data || []).map((d: { activity_date: string; session_count: number }) => ({
       date: d.activity_date,
       count: d.session_count,

@@ -1,5 +1,5 @@
 import { transcribeAudio } from "@/lib/ai";
-import { getUser, jsonError, SIGN_IN_AGAIN } from "@/lib/server";
+import { consumeQuota, getUser, jsonError, refundQuota, SIGN_IN_AGAIN } from "@/lib/server";
 
 // Vercel rejects request bodies over ~4.5 MB; a minute of speech is well under this.
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -21,7 +21,18 @@ export async function POST(request) {
     // (The web sends recording.webm/.mp4; the iPhone app sends recording-xxxx.m4a.)
     const file = AUDIO_EXT.test(audio.name || "") ? audio : new File([audio], "recording.m4a", { type: audio.type || "audio/mp4" });
 
-    const text = await transcribeAudio(file);
+    const quota = await consumeQuota(user.id, "transcribe");
+    if (!quota.allowed) {
+      return jsonError("You've used today's voice messages. Type in pinyin instead — tone numbers are fine.", 429, { limitReached: true });
+    }
+
+    let text;
+    try {
+      text = await transcribeAudio(file);
+    } catch (err) {
+      await refundQuota(user.id, "transcribe");
+      throw err;
+    }
     return Response.json({ text });
   } catch (error) {
     console.error("Transcription error:", error);

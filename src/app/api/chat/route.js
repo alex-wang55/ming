@@ -1,10 +1,8 @@
 import { getAIResponse } from "@/lib/ai";
-import { getAdmin, getUser, jsonError, SIGN_IN_AGAIN } from "@/lib/server";
+import { consumeQuota, DAILY_LIMITS, getAdmin, getUser, jsonError, refundQuota, SIGN_IN_AGAIN } from "@/lib/server";
 import { chineseLevelLine } from "@/lib/level";
 import { parseToneTags } from "@/lib/tags";
 
-// Hard daily cap per user, so worst-case AI spend is bounded.
-const DAILY_MESSAGE_LIMIT = 30;
 // Only the recent conversation is sent to the model, so cost per message stays flat
 // instead of growing with the length of the chat.
 const HISTORY_LIMIT = 20;
@@ -30,9 +28,10 @@ export async function POST(request) {
   } catch {
     return jsonError("Invalid request", 400);
   }
+  if (!body || typeof body !== "object") return jsonError("Invalid request", 400);
 
   const history = (Array.isArray(body.messages) ? body.messages : [])
-    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .slice(-HISTORY_LIMIT)
     .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
   // Anthropic requires the conversation to start with a user turn.
@@ -42,18 +41,12 @@ export async function POST(request) {
   }
 
   const db = getAdmin();
-  const today = new Date().toISOString().slice(0, 10);
 
   try {
-    const { data: usage } = await db
-      .from("daily_usage")
-      .select("message_count")
-      .eq("user_id", user.id)
-      .eq("usage_date", today)
-      .maybeSingle();
-    const used = usage?.message_count || 0;
-
-    if (used >= DAILY_MESSAGE_LIMIT) {
+    // Take the message from today's quota before calling the AI, in one atomic step,
+    // so parallel requests can't slip past the cap. It's given back if the reply fails.
+    const quota = await consumeQuota(user.id, "message");
+    if (!quota.allowed) {
       return jsonError(
         "You've reached today's message limit. Come back tomorrow — or this is a good moment to review your words.",
         429,
@@ -61,29 +54,22 @@ export async function POST(request) {
       );
     }
 
-    const context = await buildContext(db, user.id, body.preferences);
-
     let reply;
     try {
+      const context = await buildContext(db, user.id, body.preferences || {});
       reply = await getAIResponse(history, context);
     } catch (err) {
       console.error("AI provider error:", err);
+      await refundQuota(user.id, "message");
       return jsonError("Ming couldn't answer just now. Try again in a moment.", 502);
     }
-
-    await db
-      .from("daily_usage")
-      .upsert(
-        { user_id: user.id, usage_date: today, message_count: used + 1 },
-        { onConflict: "user_id,usage_date" }
-      );
 
     const newWords = await saveNewWords(db, user.id, reply);
 
     return Response.json({
       reply,
       newWords,
-      remaining: DAILY_MESSAGE_LIMIT - used - 1,
+      remaining: quota.used === null ? undefined : Math.max(DAILY_LIMITS.message - quota.used, 0),
     });
   } catch (error) {
     console.error("Chat API error:", error);
@@ -131,7 +117,7 @@ async function buildContext(db, userId, preferences = {}) {
 }
 
 // Saves words Ming tagged as new. Existing words are left alone so a re-mention
-// doesn't reset their review schedule.
+// doesn't reset their review schedule. Returns how many were added.
 async function saveNewWords(db, userId, reply) {
   const seen = new Set();
   const tagged = parseToneTags(reply).filter((w) => {
@@ -142,29 +128,22 @@ async function saveNewWords(db, userId, reply) {
   if (!tagged.length) return 0;
 
   try {
-    const { data: existing } = await db
+    // ignoreDuplicates skips words the learner already has (keeping their review
+    // schedule) in one query, and can't fail on a race with another request.
+    const { data, error } = await db
       .from("words")
-      .select("chinese")
-      .eq("user_id", userId)
-      .in(
-        "chinese",
-        tagged.map((w) => w.hanzi)
-      );
-    const have = new Set((existing || []).map((w) => w.chinese));
-    const fresh = tagged
-      .filter((w) => !have.has(w.hanzi))
-      .slice(0, MAX_NEW_WORDS)
-      .map((w) => ({
-        user_id: userId,
-        chinese: w.hanzi.slice(0, 20),
-        pinyin: w.pinyin.slice(0, 60),
-        meaning: w.meaning.slice(0, 80),
-      }));
-    if (!fresh.length) return 0;
-
-    const { error } = await db.from("words").insert(fresh);
+      .upsert(
+        tagged.slice(0, MAX_NEW_WORDS).map((w) => ({
+          user_id: userId,
+          chinese: w.hanzi.slice(0, 20),
+          pinyin: w.pinyin.slice(0, 60),
+          meaning: w.meaning.slice(0, 80),
+        })),
+        { onConflict: "user_id,chinese", ignoreDuplicates: true }
+      )
+      .select("id");
     if (error) throw error;
-    return fresh.length;
+    return data?.length || 0;
   } catch (err) {
     console.error("Saving words failed:", err);
     return 0;

@@ -1,4 +1,4 @@
-import { getUser, jsonError, SIGN_IN_AGAIN } from "@/lib/server";
+import { consumeQuota, getUser, jsonError, refundQuota, SIGN_IN_AGAIN } from "@/lib/server";
 
 const MAX_CHARS = 120;
 
@@ -7,10 +7,15 @@ export async function POST(request) {
   const user = await getUser(request);
   if (!user) return jsonError(SIGN_IN_AGAIN, 401);
 
+  let charged = false;
   try {
     const { text } = await request.json();
     const input = typeof text === "string" ? text.trim().slice(0, MAX_CHARS) : "";
     if (!input) return jsonError("No text provided", 400);
+
+    const quota = await consumeQuota(user.id, "tts");
+    if (!quota.allowed) return jsonError("You've played a lot of audio today. It'll be back tomorrow.", 429, { limitReached: true });
+    charged = true;
 
     const response = await fetch(
       `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_TTS_API_KEY}`,
@@ -28,12 +33,15 @@ export async function POST(request) {
     const data = await response.json();
     if (!response.ok || !data.audioContent) {
       console.error("TTS provider error:", data.error || response.status);
+      await refundQuota(user.id, "tts");
+      charged = false;
       return jsonError("Audio isn't available right now.", 502);
     }
 
     return Response.json({ audio: data.audioContent });
   } catch (error) {
     console.error("TTS error:", error);
+    if (charged) await refundQuota(user.id, "tts");
     return jsonError("Audio isn't available right now.", 500);
   }
 }

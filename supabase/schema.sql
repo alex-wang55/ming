@@ -47,12 +47,15 @@ create table public.daily_activity (
   unique (user_id, activity_date)
 );
 
--- Written only by the server (service key) to enforce the daily message cap.
+-- Written only by the server (service key, via consume_daily_quota below) to
+-- enforce the daily caps on chat, audio and voice.
 create table public.daily_usage (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id) on delete cascade,
   usage_date date not null,
   message_count integer default 0,
+  tts_count integer not null default 0,
+  transcribe_count integer not null default 0,
   unique (user_id, usage_date)
 );
 
@@ -95,3 +98,55 @@ revoke execute on function public.handle_new_user() from public, anon, authentic
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- Atomic daily caps (see supabase/migrations/20261103_atomic_usage_caps.sql).
+-- Adds p_amount to today's (UTC) counter for p_kind and returns the new count, or
+-- null if the counter is already at p_limit. A negative p_amount gives one back
+-- (used when the provider fails) and is never blocked.
+create or replace function public.consume_daily_quota(
+  p_user_id uuid,
+  p_kind text,
+  p_limit integer,
+  p_amount integer default 1
+)
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_col text;
+  v_today date := (now() at time zone 'utc')::date;
+  v_count integer;
+begin
+  v_col := case p_kind
+    when 'message' then 'message_count'
+    when 'tts' then 'tts_count'
+    when 'transcribe' then 'transcribe_count'
+  end;
+  if v_col is null then
+    raise exception 'unknown quota kind: %', p_kind;
+  end if;
+
+  insert into public.daily_usage (user_id, usage_date)
+  values (p_user_id, v_today)
+  on conflict (user_id, usage_date) do nothing;
+
+  execute format(
+    'update public.daily_usage
+        set %1$I = greatest(coalesce(%1$I, 0) + $1, 0)
+      where user_id = $2 and usage_date = $3
+        and ($1 < 0 or coalesce(%1$I, 0) < $4)
+      returning %1$I',
+    v_col
+  )
+  into v_count
+  using p_amount, p_user_id, v_today, p_limit;
+
+  return v_count;
+end;
+$$;
+
+-- Server only: a signed-in user calling this through the API could give themselves
+-- quota back, so only the service role may run it.
+revoke execute on function public.consume_daily_quota(uuid, text, integer, integer) from public, anon, authenticated;
+grant execute on function public.consume_daily_quota(uuid, text, integer, integer) to service_role;
