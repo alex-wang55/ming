@@ -7,6 +7,8 @@ import { useSettings } from "@/lib/settings";
 import { localDateKey } from "@/lib/dates";
 import { isDue, nextReview } from "@/lib/review";
 import { parseToneTags } from "@/lib/tags";
+import { findLesson } from "@/lib/lessons";
+import { DAILY_MESSAGE_LIMIT, usageDateKey } from "@/lib/limits";
 import Auth from "@/components/Auth";
 import GoalSetup from "@/components/GoalSetup";
 import AppShell from "@/components/AppShell";
@@ -36,6 +38,14 @@ export default function Home() {
   const conversationId = useRef(null);
   const loadedUserId = useRef(null);
   const sending = useRef(false);
+  // The lesson in progress, readable from callbacks that outlive a render (saveConversation
+  // runs right after startConversation, before the state update lands).
+  const lessonRef = useRef(null);
+
+  function setLesson(lesson) {
+    lessonRef.current = lesson;
+    setCurrentLesson(lesson);
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -62,6 +72,7 @@ export default function Home() {
       loadWords(user.id);
       loadProgress(user.id);
       loadActivity(user.id);
+      loadUsage(user.id);
     }
   }, [user]);
 
@@ -75,7 +86,7 @@ export default function Home() {
     setCompletedLessons([]);
     setActivity([]);
     setStreak(0);
-    setCurrentLesson(null);
+    setLesson(null);
     setReview(null);
     setUsageLeft(null);
     setTab("learn");
@@ -101,7 +112,7 @@ export default function Home() {
   async function loadConversation(uid) {
     const { data } = await supabase
       .from("conversations")
-      .select("id, messages")
+      .select("id, messages, lesson_id")
       .eq("user_id", uid)
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -109,7 +120,20 @@ export default function Home() {
     if (data?.messages?.length) {
       setMessages(data.messages);
       conversationId.current = data.id;
+      // Pick the lesson back up, so "Mark complete" is still there after a reload.
+      setLesson(findLesson(data.lesson_id));
     }
+  }
+
+  // Today's remaining messages, so the counter is right before the first send.
+  async function loadUsage(uid) {
+    const { data, error } = await supabase
+      .from("daily_usage")
+      .select("message_count")
+      .eq("user_id", uid)
+      .eq("usage_date", usageDateKey())
+      .maybeSingle();
+    if (!error) setUsageLeft(Math.max(DAILY_MESSAGE_LIMIT - (data?.message_count || 0), 0));
   }
 
   async function loadWords(uid) {
@@ -189,7 +213,7 @@ export default function Home() {
     } else {
       const { data } = await supabase
         .from("conversations")
-        .insert({ user_id: user.id, messages: clean })
+        .insert({ user_id: user.id, messages: clean, lesson_id: lessonRef.current?.id ?? null })
         .select("id")
         .single();
       if (data) conversationId.current = data.id;
@@ -239,7 +263,7 @@ export default function Home() {
 
   function startConversation(prompt, lesson) {
     if (sending.current) return;
-    setCurrentLesson(lesson);
+    setLesson(lesson);
     conversationId.current = null; // each lesson gets its own saved conversation
     setTab("chat");
     sendMessage(prompt, []);
@@ -267,7 +291,11 @@ export default function Home() {
     }
     const next = [...new Set([...completedLessons, lessonId])];
     setCompletedLessons(next);
-    setCurrentLesson(null);
+    setLesson(null);
+    // The chat stays, but it's no longer a lesson in progress.
+    if (conversationId.current) {
+      supabase.from("conversations").update({ lesson_id: null }).eq("id", conversationId.current).then(() => {});
+    }
     setTab("learn");
 
     // Every 3rd lesson: a quick check on the most recent words.

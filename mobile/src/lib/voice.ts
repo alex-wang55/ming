@@ -12,8 +12,9 @@ export type MicState = "idle" | "starting" | "recording" | "transcribing";
 /* ---------- Speaking to Ming: record, then send to /api/transcribe (Whisper) ---------- */
 
 export function useMingRecorder(onText: (text: string) => void, onError: (message: string) => void) {
-  // HIGH_QUALITY records AAC in an .m4a, which Whisper accepts as-is.
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  // HIGH_QUALITY records AAC in an .m4a, which Whisper accepts as-is. Metering feeds the
+  // live level bars in the chat box (see RecordingBar in chat.tsx).
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const [state, setState] = useState<MicState>("idle");
   const startedAt = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,7 +81,7 @@ export function useMingRecorder(onText: (text: string) => void, onError: (messag
     }
   }, [recorder, onError, stop]);
 
-  return { state, start, stop };
+  return { state, start, stop, recorder };
 }
 
 /* ---------- Ming speaking: /api/tts returns base64 MP3, cached on disk ---------- */

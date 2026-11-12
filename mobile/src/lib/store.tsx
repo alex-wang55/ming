@@ -1,6 +1,8 @@
 import { router } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LESSONS } from "@/shared/lessons";
+import { AppState } from "react-native";
+import { findLesson, LESSONS } from "@/shared/lessons";
+import { DAILY_MESSAGE_LIMIT, usageDateKey } from "@/shared/limits";
 import { localDateKey } from "@/shared/dates";
 import { isDue, nextReview } from "@/shared/review";
 import { computeStreak } from "@/shared/streak";
@@ -54,6 +56,7 @@ type Store = {
   startReview: () => void;
   rateWord: (word: Word, rating: "easy" | "hard") => void;
   refresh: () => Promise<void>;
+  reportMessage: (content: string) => Promise<boolean>;
   withConsent: (action: () => void) => void;
   runPendingConsent: () => void;
   dropPendingConsent: () => void;
@@ -94,6 +97,12 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
 
   const conversationId = useRef<string | null>(null);
   const sendingRef = useRef(false);
+  // The lesson in progress, readable from callbacks that run before the state update lands.
+  const lessonRef = useRef<Lesson | null>(null);
+  const setLesson = useCallback((lesson: Lesson | null) => {
+    lessonRef.current = lesson;
+    setCurrentLesson(lesson);
+  }, []);
   const messagesRef = useRef<Msg[]>([]);
   const wordsRef = useRef<Word[]>([]);
   const settingsRef = useRef(settings);
@@ -144,15 +153,30 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
   const loadConversation = useCallback(async (uid: string) => {
     const { data } = await supabase
       .from("conversations")
-      .select("id, messages")
+      .select("id, messages, lesson_id")
       .eq("user_id", uid)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    // A reply may have started while this was loading; don't replace the chat under it.
+    if (sendingRef.current) return;
     if (data?.messages?.length) {
       setMessages(data.messages as Msg[]);
       conversationId.current = data.id as string;
+      // Pick the lesson back up, so "Mark complete" survives iOS closing the app.
+      setLesson(findLesson(data.lesson_id) as Lesson | null);
     }
+  }, [setLesson]);
+
+  // Today's remaining messages, so the counter is right before the first send.
+  const loadUsage = useCallback(async (uid: string) => {
+    const { data, error } = await supabase
+      .from("daily_usage")
+      .select("message_count")
+      .eq("user_id", uid)
+      .eq("usage_date", usageDateKey())
+      .maybeSingle();
+    if (!error) setUsageLeft(Math.max(DAILY_MESSAGE_LIMIT - ((data?.message_count as number | null) || 0), 0));
   }, []);
 
   useEffect(() => {
@@ -163,12 +187,28 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
     loadWords(userId);
     loadProgress(userId);
     loadActivity(userId);
-  }, [userId, loadConversation, loadWords, loadProgress, loadActivity]);
+    loadUsage(userId);
+  }, [userId, loadConversation, loadWords, loadProgress, loadActivity, loadUsage]);
+
+  // Coming back to the app: the website (or another phone) may have moved things on.
+  // Without this, the next message would save this phone's older copy of the chat over theirs.
+  useEffect(() => {
+    if (!userId) return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active" || sendingRef.current) return;
+      loadConversation(userId);
+      loadWords(userId);
+      loadProgress(userId);
+      loadActivity(userId);
+      loadUsage(userId);
+    });
+    return () => sub.remove();
+  }, [userId, loadConversation, loadWords, loadProgress, loadActivity, loadUsage]);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
-    await Promise.all([loadWords(userId), loadProgress(userId), loadActivity(userId)]);
-  }, [userId, loadWords, loadProgress, loadActivity]);
+    await Promise.all([loadConversation(userId), loadWords(userId), loadProgress(userId), loadActivity(userId), loadUsage(userId)]);
+  }, [userId, loadConversation, loadWords, loadProgress, loadActivity, loadUsage]);
 
   /* ---------------- AI consent (App Review 5.1.2(i)) ---------------- */
 
@@ -223,7 +263,7 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
           .update({ messages: clean, updated_at: new Date().toISOString() })
           .eq("id", conversationId.current);
       } else {
-        const { data } = await supabase.from("conversations").insert({ user_id: userId, messages: clean }).select("id").single();
+        const { data } = await supabase.from("conversations").insert({ user_id: userId, messages: clean, lesson_id: lessonRef.current?.id ?? null }).select("id").single();
         if (data) conversationId.current = data.id as string;
       }
     },
@@ -280,13 +320,13 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
     (prompt: string, lesson: Lesson | null) => {
       withConsent(() => {
         if (sendingRef.current) return;
-        setCurrentLesson(lesson);
+        setLesson(lesson);
         conversationId.current = null; // each lesson gets its own saved conversation
         router.navigate("/chat");
         send(prompt, []);
       });
     },
-    [withConsent, send]
+    [withConsent, send, setLesson]
   );
 
   const startLesson = useCallback((lesson: Lesson) => startConversation(lesson.prompt, lesson), [startConversation]);
@@ -321,14 +361,18 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
     haptic.success();
     const next = [...new Set([...completedLessons, lessonId])];
     setCompletedLessons(next);
-    setCurrentLesson(null);
+    setLesson(null);
+    // The chat stays, but it's no longer a lesson in progress.
+    if (conversationId.current) {
+      supabase.from("conversations").update({ lesson_id: null }).eq("id", conversationId.current).then(() => {});
+    }
     router.navigate("/");
     // Every 3rd lesson: a quick check on the most recent words.
     if (next.length % 3 === 0 && wordsRef.current.length) {
       setTimeout(() => openReview("Quick check", wordsRef.current.slice(0, 3)), 350);
     }
     return true;
-  }, [currentLesson, userId, completedLessons, openReview]);
+  }, [currentLesson, userId, completedLessons, openReview, setLesson]);
 
   const startReview = useCallback(() => {
     const due = wordsRef.current
@@ -343,6 +387,17 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
     const { error } = await supabase.from("words").update(patch).eq("id", word.id);
     if (error) console.warn("Saving review failed:", error.message);
   }, []);
+
+  // "Report this reply" on Ming's messages. Goes to message_reports for the developer to read.
+  const reportMessage = useCallback(
+    async (content: string) => {
+      if (!userId) return false;
+      const { error } = await supabase.from("message_reports").insert({ user_id: userId, content: content.slice(0, 4000) });
+      if (error) console.warn("Report failed:", error.message);
+      return !error;
+    },
+    [userId]
+  );
 
   const dueCount = useMemo(() => words.filter((w) => isDue(w)).length, [words]);
 
@@ -365,6 +420,7 @@ function StoreInner({ userId, children }: { userId: string | null; children: Rea
     startReview,
     rateWord,
     refresh,
+    reportMessage,
     withConsent,
     runPendingConsent,
     dropPendingConsent,

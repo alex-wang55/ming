@@ -1,6 +1,8 @@
+import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Rise } from "@/components/motion";
 import { PrimaryButton } from "@/components/ui";
 import { WEB_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -88,7 +90,21 @@ export default function SignIn() {
       </Text>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }} keyboardShouldPersistTaps="handled">
-          <View style={{ backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 20, padding: 24, gap: 14 }}>
+          <Rise>
+          <View
+            style={{
+              backgroundColor: t.surface,
+              borderWidth: 1,
+              borderColor: t.border,
+              borderRadius: 20,
+              padding: 24,
+              gap: 14,
+              shadowColor: "#8b6a3a",
+              shadowOpacity: t.dark ? 0 : 0.1,
+              shadowRadius: 24,
+              shadowOffset: { width: 0, height: 8 },
+            }}
+          >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 4 }}>
               <View
                 style={{
@@ -196,10 +212,19 @@ export default function SignIn() {
                 <Text style={{ color: t.textMuted, fontSize: 14, textDecorationLine: "underline" }}>Back to sign in</Text>
               </Pressable>
             )}
-            {mode === "signup" && (
-              <Text style={{ fontSize: 12, color: t.textMuted, textAlign: "center" }}>By continuing you agree to our terms and privacy policy.</Text>
-            )}
+            <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.textMuted, textAlign: "center" }}>
+              {mode === "signup" ? "By creating an account you agree to the " : "See the "}
+              <Text accessibilityRole="link" onPress={() => WebBrowser.openBrowserAsync(`${WEB_URL}/terms`)} style={{ color: t.accent, textDecorationLine: "underline" }}>
+                Terms
+              </Text>
+              {" and "}
+              <Text accessibilityRole="link" onPress={() => WebBrowser.openBrowserAsync(`${WEB_URL}/privacy`)} style={{ color: t.accent, textDecorationLine: "underline" }}>
+                Privacy Policy
+              </Text>
+              .
+            </Text>
           </View>
+          </Rise>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

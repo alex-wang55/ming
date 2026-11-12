@@ -4,6 +4,7 @@ import { themes, radius } from "@/lib/theme";
 import { apiFetch } from "@/lib/api";
 
 const MAX_RECORDING_MS = 60 * 1000;
+const BARS = 28;
 
 function pickMimeType() {
   if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
@@ -20,6 +21,7 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
   const [value, setValue] = useState("");
   const [mic, setMic] = useState("idle"); // idle | starting | recording | transcribing
   const [error, setError] = useState(null);
+  const [stream, setStream] = useState(null);
   const recorder = useRef(null);
   const chunks = useRef([]);
   const stopTimer = useRef(null);
@@ -30,7 +32,7 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
     if (!ta.current) return;
     ta.current.style.height = "auto";
     ta.current.style.height = Math.min(ta.current.scrollHeight, 140) + "px";
-  }, [value]);
+  }, [value, mic]);
 
   useEffect(
     () => () => {
@@ -59,13 +61,14 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
 
     setMic("starting");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = pickMimeType();
       chunks.current = [];
-      recorder.current = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorder.current = new MediaRecorder(media, mimeType ? { mimeType } : undefined);
       recorder.current.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
       recorder.current.onstop = transcribe;
       recorder.current.start();
+      setStream(media);
       setMic("recording");
       stopTimer.current = setTimeout(stopRec, MAX_RECORDING_MS);
     } catch {
@@ -79,6 +82,7 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
     if (!recorder.current || recorder.current.state === "inactive") return;
     recorder.current.stop();
     recorder.current.stream.getTracks().forEach((tr) => tr.stop());
+    setStream(null);
     setMic("transcribing");
   }
 
@@ -104,8 +108,9 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
   }
 
   const recording = mic === "recording";
-  const busy = disabled || mic === "transcribing" || mic === "starting";
-  const canSend = value.trim() && !busy && !recording;
+  const transcribing = mic === "transcribing";
+  const busy = disabled || transcribing || mic === "starting";
+  const canSend = !!value.trim() && !busy && !recording;
   const keepFocus = (e) => e.preventDefault(); // tapping a button shouldn't close the phone keyboard
 
   let hint = compact ? null : "Enter to send · Shift + Enter for a new line · tap the mic to speak";
@@ -120,91 +125,107 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
           display: "flex",
           alignItems: "flex-end",
           gap: "8px",
-          background: t.surface,
-          border: `1px solid ${recording ? t.danger : t.border}`,
-          borderRadius: radius.lg,
-          padding: "8px 8px 8px 14px",
-          boxShadow: t.shadow,
-          transition: "border-color 0.15s",
+          background: recording ? t.accentSoft : t.surface,
+          border: `1px solid ${recording ? t.accent : t.border}`,
+          borderRadius: radius.xl,
+          padding: "7px 7px 7px 16px",
+          boxShadow: recording ? `0 0 0 4px ${t.accentSoft}` : t.shadow,
+          transition: "border-color 0.2s, background-color 0.2s, box-shadow 0.2s",
         }}
       >
-        <textarea
-          ref={ta}
-          rows={1}
-          value={value}
-          disabled={busy || recording}
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={() => onFocusChange?.(true)}
-          onBlur={() => onFocusChange?.(false)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !compact && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          enterKeyHint={compact ? "enter" : "send"}
-          aria-label="Message Ming"
-          placeholder={
-            mic === "transcribing"
-              ? "Transcribing your audio..."
-              : recording
-              ? "Listening — tap the mic again to send"
-              : "Message Ming"
-          }
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: t.text,
-            fontSize: "14.5px",
-            lineHeight: 1.55,
-            resize: "none",
-            overflowY: "auto",
-            maxHeight: "140px",
-            paddingTop: "7px",
-            paddingBottom: "7px",
-          }}
-        />
-
-        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-          <IconButton
-            onPointerDown={keepFocus}
-            onClick={toggleMic}
-            disabled={disabled || mic === "transcribing" || mic === "starting"}
-            title={recording ? "Stop and send" : "Speak"}
-            aria-label={recording ? "Stop recording and send" : "Record a voice message"}
-            aria-pressed={recording}
-            style={{
-              background: recording ? `${t.danger}1a` : "transparent",
-              border: `1px solid ${recording ? t.danger : t.border}`,
-              color: recording ? t.danger : t.textMuted,
-              animation: recording ? "pulse 1.2s ease-in-out infinite" : "none",
+        {recording ? (
+          // While you speak, the text box becomes a live level meter with a timer.
+          <RecordingBar stream={stream} t={t} />
+        ) : transcribing ? (
+          <div className="fade-up" style={{ flex: 1, display: "flex", alignItems: "center", gap: "10px", height: "38px", color: t.textSecondary, fontSize: "14px" }}>
+            <span
+              aria-hidden
+              style={{
+                width: "14px",
+                height: "14px",
+                borderRadius: "50%",
+                border: `2px solid ${t.accentBorder}`,
+                borderTopColor: t.accent,
+                animation: "spin 0.7s linear infinite",
+              }}
+            />
+            Turning that into text
+          </div>
+        ) : (
+          <textarea
+            ref={ta}
+            rows={1}
+            value={value}
+            disabled={busy}
+            onChange={(e) => setValue(e.target.value)}
+            onFocus={() => onFocusChange?.(true)}
+            onBlur={() => onFocusChange?.(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !compact && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
             }}
-          >
-            {recording ? <StopIcon /> : <MicIcon />}
-          </IconButton>
+            enterKeyHint={compact ? "enter" : "send"}
+            aria-label="Message Ming"
+            placeholder="Message Ming (pinyin is fine)"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: t.text,
+              fontSize: "14.5px",
+              lineHeight: 1.55,
+              resize: "none",
+              overflowY: "auto",
+              maxHeight: "140px",
+              paddingTop: "8px",
+              paddingBottom: "8px",
+            }}
+          />
+        )}
 
-          <IconButton
+        {/* The mic gives way to Send once there's text, like a single smart button. */}
+        {canSend ? (
+          <RoundButton
+            key="send"
             onPointerDown={keepFocus}
             onClick={submit}
-            disabled={!canSend}
             title="Send"
             aria-label="Send message"
-            style={{
-              background: canSend ? t.accent : "transparent",
-              border: `1px solid ${canSend ? t.accent : t.border}`,
-              color: canSend ? t.btnText : t.textFaint,
-            }}
+            style={{ background: t.accent, border: `1px solid ${t.accent}`, color: t.btnText }}
           >
             <ArrowUpIcon />
-          </IconButton>
-        </div>
+          </RoundButton>
+        ) : (
+          <div key="mic" style={{ position: "relative", flexShrink: 0 }}>
+            {recording && <span className="ring" style={{ background: t.accent }} />}
+            <RoundButton
+              onPointerDown={keepFocus}
+              onClick={toggleMic}
+              disabled={busy}
+              title={recording ? "Stop and send" : "Speak"}
+              aria-label={recording ? "Stop recording and send" : "Record a voice message"}
+              aria-pressed={recording}
+              style={{
+                position: "relative",
+                background: recording ? t.accent : "transparent",
+                border: `1px solid ${recording ? t.accent : t.border}`,
+                color: recording ? t.btnText : t.textSecondary,
+              }}
+            >
+              {recording ? <StopIcon /> : <MicIcon />}
+            </RoundButton>
+          </div>
+        )}
       </div>
 
       {(error || hint) && (
         <p
+          key={error || hint}
+          className="fade-up"
           role={error ? "alert" : undefined}
           style={{ fontSize: "11px", color: error ? t.danger : t.textFaint, textAlign: "center", margin: 0 }}
         >
@@ -215,19 +236,90 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
   );
 }
 
-function IconButton({ children, style, ...props }) {
+// Live microphone level as a row of bars that scroll right to left, plus elapsed time.
+// The bars are drawn straight to the DOM from an AnalyserNode, so the meter doesn't
+// re-render React thirty times a second.
+function RecordingBar({ stream, t }) {
+  const bars = useRef(null);
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    const started = Date.now();
+    const clock = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 250);
+    return () => clearInterval(clock);
+  }, []);
+
+  useEffect(() => {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!stream || !AudioCtx) return;
+    const ctx = new AudioCtx();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    const samples = new Uint8Array(analyser.fftSize);
+    const levels = Array(BARS).fill(0);
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    const timer = setInterval(() => {
+      analyser.getByteTimeDomainData(samples);
+      let peak = 0;
+      for (const s of samples) peak = Math.max(peak, Math.abs(s - 128) / 128);
+      levels.shift();
+      levels.push(still ? 0.4 : Math.min(peak * 2.2, 1));
+      const nodes = bars.current?.children;
+      if (nodes) for (let i = 0; i < nodes.length; i++) nodes[i].style.height = `${3 + levels[i] * 23}px`;
+    }, 80);
+
+    return () => {
+      clearInterval(timer);
+      ctx.close().catch(() => {});
+    };
+  }, [stream]);
+
+  return (
+    <div
+      className="fade-up"
+      aria-label={`Recording, ${seconds} seconds. Tap stop to send.`}
+      style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "12px", height: "38px" }}
+    >
+      <span style={{ fontSize: "13.5px", fontWeight: 600, color: t.accent, fontVariantNumeric: "tabular-nums", minWidth: "32px" }}>
+        0:{String(seconds).padStart(2, "0")}
+      </span>
+      <div ref={bars} aria-hidden style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "3px", height: "26px", overflow: "hidden" }}>
+        {Array.from({ length: BARS }, (_, i) => (
+          <span
+            key={i}
+            style={{
+              flex: "1 1 0",
+              maxWidth: "4px",
+              height: "3px",
+              borderRadius: "2px",
+              background: t.accent,
+              opacity: 0.35 + 0.65 * (i / BARS),
+              transition: "height 0.08s linear",
+            }}
+          />
+        ))}
+      </div>
+      <span style={{ fontSize: "11.5px", color: t.textMuted, flexShrink: 0 }}>Tap to send</span>
+    </div>
+  );
+}
+
+function RoundButton({ children, style, ...props }) {
   return (
     <button
       {...props}
+      className="press pop"
       style={{
-        width: "36px",
-        height: "36px",
-        borderRadius: radius.md,
+        width: "38px",
+        height: "38px",
+        borderRadius: radius.full,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        transition: "all 0.15s",
-        opacity: props.disabled ? 0.45 : 1,
+        flexShrink: 0,
+        opacity: props.disabled ? 0.45 : undefined,
         cursor: props.disabled ? "not-allowed" : "pointer",
         ...style,
       }}
@@ -247,7 +339,7 @@ function MicIcon() {
 }
 function StopIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
       <rect x="5" y="5" width="14" height="14" rx="2" />
     </svg>
   );

@@ -63,6 +63,34 @@ button:disabled { cursor: not-allowed; }
 
 .fade-up { animation: fadeUp 0.25s ease forwards; }
 
+/* Ming's motion vocabulary (the iOS app's version is mobile/src/components/motion.tsx):
+   things rise in softly, buttons give a little under the pointer, the mic breathes while
+   it listens. Everything here is switched off by prefers-reduced-motion below. */
+/* No "to" opacity: they finish at the element's own opacity, so a disabled (dimmed) button stays dimmed. */
+@keyframes riseIn { from { opacity: 0; transform: translateY(10px); } }
+@keyframes popIn { 0% { opacity: 0; transform: scale(0.86); } 70% { transform: scale(1.03); } }
+@keyframes ringPulse { from { opacity: 0.35; transform: scale(1); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes eq { 0%,100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+@keyframes tabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Stagger a group with style={{ "--i": n }}. */
+.rise { animation: riseIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+.pop { animation: popIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+.tab-in { animation: tabIn 0.22s ease both; }
+
+.press { transition: transform 0.12s ease, box-shadow 0.18s ease, background-color 0.15s ease, border-color 0.15s ease; }
+.press:active:not(:disabled) { transform: scale(0.96); }
+.lift:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(31,26,20,0.10); }
+.lift:active:not(:disabled) { transform: scale(0.96); }
+
+.ring { position: absolute; inset: 0; border-radius: 999px; pointer-events: none; animation: ringPulse 1.3s ease-out infinite; }
+
+.eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; }
+.eq span { width: 2.5px; height: 10px; border-radius: 2px; transform-origin: bottom; transform: scaleY(0.3); }
+.eq.on span { animation: eq 0.52s ease-in-out infinite; }
+.eq.on span:nth-child(2) { animation-delay: 0.11s; }
+.eq.on span:nth-child(3) { animation-delay: 0.22s; }
+
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid rgba(212,168,67,0.5);
   outline-offset: 2px;

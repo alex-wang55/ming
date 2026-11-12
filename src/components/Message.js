@@ -15,7 +15,7 @@ export default function Message({ message, theme }) {
 
   return (
     <div
-      className="fade-up"
+      className="rise"
       style={{
         display: "flex",
         alignItems: "flex-start",
@@ -102,29 +102,41 @@ function Content({ content, t, playing, play, muted }) {
 
       {tags.length > 0 && (
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
-          {tags.map((tag, i) => (
-            <button
-              key={i}
-              onClick={() => play(tag.hanzi)}
-              title={`Play ${tag.hanzi}`}
-              style={{
-                textAlign: "left",
-                background: t.bg,
-                border: `1px solid ${t.border}`,
-                borderRadius: "8px",
-                padding: "8px 10px",
-                minWidth: "90px",
-                opacity: playing === tag.hanzi ? 0.6 : 1,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "baseline", gap: "5px", marginBottom: "5px" }}>
-                <span style={{ fontFamily: font.cn, fontSize: "15px", color: t.accent }}>{tag.hanzi}</span>
-                <span style={{ fontSize: "10px", color: t.textSecondary, fontStyle: "italic" }}>{tag.pinyin}</span>
-              </div>
-              <ToneGraphs tones={tag.tones} color={t.accent} height={16} />
-              <p style={{ fontSize: "9.5px", color: t.textMuted, margin: "4px 0 0" }}>{tag.meaning}</p>
-            </button>
-          ))}
+          {tags.map((tag, i) => {
+            const live = playing === tag.hanzi;
+            return (
+              // New-word cards arrive one after another, just after the reply itself.
+              <button
+                key={i}
+                className="pop press lift"
+                onClick={() => play(tag.hanzi)}
+                title={`Play ${tag.hanzi}`}
+                style={{
+                  "--i": i + 2,
+                  textAlign: "left",
+                  background: live ? t.accentSoft : t.bg,
+                  border: `1px solid ${live ? t.accent : t.border}`,
+                  borderRadius: radius.md,
+                  padding: "9px 11px",
+                  minWidth: "104px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "5px" }}>
+                  <span style={{ display: "flex", alignItems: "baseline", gap: "5px" }}>
+                    <span style={{ fontFamily: font.cn, fontSize: "17px", color: t.accent }}>{tag.hanzi}</span>
+                    <span style={{ fontSize: "11px", color: t.textSecondary, fontStyle: "italic" }}>{tag.pinyin}</span>
+                  </span>
+                  <span className={live ? "eq on" : "eq"} aria-hidden>
+                    {[0, 1, 2].map((b) => (
+                      <span key={b} style={{ background: live ? t.accent : t.textFaint }} />
+                    ))}
+                  </span>
+                </div>
+                <ToneGraphs tones={tag.tones} color={t.accent} height={16} />
+                <p style={{ fontSize: "11px", color: t.textMuted, margin: "4px 0 0" }}>{tag.meaning}</p>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
