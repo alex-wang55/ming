@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { cnFont, radius, useMingTheme } from "@/lib/theme";
+import { PressableScale } from "./motion";
 
 // Shared building blocks, styled after the web app's components.
 
@@ -88,11 +89,11 @@ export function PrimaryButton({
 }) {
   const t = useMingTheme();
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={disabled || busy}
-      accessibilityRole="button"
-      style={({ pressed }) => [
+      scaleTo={0.97}
+      style={[
         {
           backgroundColor: t.accent,
           borderRadius: radius.md,
@@ -100,13 +101,18 @@ export function PrimaryButton({
           paddingHorizontal: 16,
           alignItems: "center",
           justifyContent: "center",
-          opacity: disabled ? 0.45 : pressed ? 0.85 : 1,
+          opacity: disabled ? 0.45 : 1,
+          // A soft lift so the main action reads as the top of the hierarchy.
+          shadowColor: t.accent,
+          shadowOpacity: disabled ? 0 : 0.22,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
         },
         style,
       ]}
     >
       {busy ? <ActivityIndicator color={t.btnText} /> : <Text style={{ color: t.btnText, fontSize: 16, fontWeight: "600" }}>{children}</Text>}
-    </Pressable>
+    </PressableScale>
   );
 }
 

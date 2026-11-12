@@ -95,6 +95,7 @@ export default function Auth({ theme = "light", recovery = false, onRecovered })
       <Deco side="right" t={t}>语</Deco>
 
       <form
+        className="rise"
         onSubmit={handleSubmit}
         style={{
           background: t.surface,
@@ -226,6 +227,7 @@ export default function Auth({ theme = "light", recovery = false, onRecovered })
 
         <button
           type="submit"
+          className="press"
           disabled={loading}
           style={{
             padding: "13px",
@@ -253,9 +255,17 @@ export default function Auth({ theme = "light", recovery = false, onRecovered })
             Back to sign in
           </button>
         )}
-        {mode === "signup" && (
-          <p style={{ fontSize: "11px", color: t.textMuted, textAlign: "center", margin: 0 }}>
-            By continuing you agree to our terms and privacy policy.
+        {(mode === "login" || mode === "signup") && (
+          <p style={{ fontSize: "11.5px", color: t.textMuted, textAlign: "center", margin: 0 }}>
+            {mode === "signup" ? "By creating an account you agree to the " : "See the "}
+            <a href="/terms" style={{ color: t.accent }}>
+              Terms
+            </a>
+            {" and "}
+            <a href="/privacy" style={{ color: t.accent }}>
+              Privacy Policy
+            </a>
+            .
           </p>
         )}
       </form>

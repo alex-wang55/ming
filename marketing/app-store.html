@@ -1,0 +1,292 @@
+<title>Ming App Store Kit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700&display=swap">
+<style>
+  /* Layout: a quiet working page; the boards and the looping phone are the only loud things on it.
+     Page tokens follow the viewer's theme. Board tokens (--m-*) are Ming's own palette from
+     src/lib/theme.js and stay fixed, because a screenshot has one look whatever theme you view it in. */
+  :root {
+    --bg: #f3efe7; --fg: #1f1a14; --muted: #7a6f60; --line: #ddd3c2; --panel: #faf8f4; --accent: #8b6a3a;
+    --m-cream: #faf8f4; --m-paper: #ffffff; --m-ink: #1f1a14; --m-ink2: #6a5f52; --m-mute: #a89d8e; --m-line: #e8e0d4;
+    --m-gold: #8b6a3a; --m-gold-soft: #fff7ec; --m-gold-line: #e8d4a8; --m-btn: #fff7ec;
+    --m-night: #0a0a08; --m-night2: #121210; --m-night-ink: #f0ece0; --m-night-mute: #8d846f; --m-night-gold: #d4a843;
+    --m-night-soft: #1c1910; --m-night-line: #2b2618;
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --cn: "Noto Serif SC", "Songti SC", serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #100f0c; --fg: #f0ece0; --muted: #9a917d; --line: #2b2618; --panel: #17150f; --accent: #d4a843; color-scheme: dark } }
+  :root[data-theme="dark"] { --bg: #100f0c; --fg: #f0ece0; --muted: #9a917d; --line: #2b2618; --panel: #17150f; --accent: #d4a843; color-scheme: dark }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); padding-block: 40px 72px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+  h1 { font-family: var(--serif); font-size: 30px; font-weight: 600; margin: 0 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--serif); font-size: 21px; font-weight: 600; margin: 0 0 4px; }
+  p.note { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0; max-width: 65ch; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+  section { display: flex; flex-direction: column; gap: 20px; }
+
+  /* ---------- boards: 1290 x 2796, everything inside sized in em off the board's width ---------- */
+  .boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
+  figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  figcaption { font-size: 12.5px; color: var(--muted); }
+  .board { container-type: inline-size; aspect-ratio: 1290 / 2796; max-width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+  .board-in { font-size: 3.1cqw; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 9em 0 0; gap: 6em; background: var(--m-cream); color: var(--m-ink); position: relative; overflow: hidden; }
+  .board-in.night { background: var(--m-night); color: var(--m-night-ink); }
+  .board-in.gold { background: linear-gradient(170deg, #f7ecd8, #efdcb8); }
+  .ghost { position: absolute; font-family: var(--cn); font-weight: 700; font-size: 34em; line-height: 1; color: var(--m-gold); opacity: 0.07; right: -0.12em; top: 0.9em; pointer-events: none; }
+  .night .ghost { color: var(--m-night-gold); opacity: 0.08; }
+  .pitch { padding: 0 3em; text-align: center; position: relative; }
+  .pitch b { display: block; font-family: var(--serif); font-weight: 600; font-size: 3.5em; line-height: 1.08; letter-spacing: -0.01em; text-wrap: balance; }
+  .pitch span { display: block; font-size: 1.45em; line-height: 1.4; margin-top: 0.9em; color: var(--m-ink2); text-wrap: balance; }
+  .night .pitch span { color: var(--m-night-mute); }
+
+  /* ---------- the phone ---------- */
+  .phone { width: 25em; flex: 1; border-radius: 3.4em 3.4em 0 0; border: 0.55em solid #1c1a17; border-bottom: 0; background: var(--m-cream); color: var(--m-ink);
+    display: flex; flex-direction: column; overflow: hidden; position: relative; box-shadow: 0 2em 5em rgba(60, 40, 10, 0.22); font-family: var(--sans); }
+  .night .phone { border-color: #2a2720; background: var(--m-night); color: var(--m-night-ink); box-shadow: 0 2em 5em rgba(0, 0, 0, 0.6); }
+  .island { width: 7em; height: 1.9em; border-radius: 1em; background: #111; margin: 0.8em auto 0.4em; flex-shrink: 0; }
+  .head { display: flex; align-items: center; gap: 0.7em; padding: 0.5em 1.1em 0.9em; border-bottom: 1px solid var(--m-line); }
+  .night .head { border-color: var(--m-night-line); }
+  .logo { width: 2.3em; height: 2.3em; border-radius: 0.5em; background: var(--m-gold-soft); border: 1px solid var(--m-gold-line); display: grid; place-items: center; font-family: var(--cn); font-weight: 700; color: var(--m-gold); font-size: 1em; flex-shrink: 0; }
+  .night .logo, .night .av { background: var(--m-night-soft); border-color: var(--m-night-line); color: var(--m-night-gold); }
+  .head b { display: block; font-size: 1.12em; font-weight: 600; }
+  .head small { display: block; font-size: 0.82em; color: var(--m-mute); }
+  .chat { flex: 1; display: flex; flex-direction: column; gap: 1em; padding: 1.1em 0.8em; min-height: 0; justify-content: flex-end; }
+  .row { display: flex; gap: 0.6em; align-items: flex-start; }
+  .row.me { justify-content: flex-end; }
+  .av { width: 1.9em; height: 1.9em; border-radius: 50%; background: var(--m-gold-soft); border: 1px solid var(--m-gold-line); display: grid; place-items: center; font-family: var(--cn); font-weight: 700; font-size: 0.8em; color: var(--m-gold); flex-shrink: 0; }
+  .bub { max-width: 82%; padding: 0.7em 0.95em; border-radius: 0.95em 0.95em 0.95em 0.28em; background: var(--m-paper); border: 1px solid var(--m-line); font-size: 1em; line-height: 1.5; box-shadow: 0 1px 3px rgba(31, 26, 20, 0.06); }
+  .night .bub { background: var(--m-night2); border-color: var(--m-night-line); box-shadow: none; }
+  .me .bub { background: var(--m-gold-soft); border-color: var(--m-gold-line); border-radius: 0.95em 0.95em 0.28em 0.95em; box-shadow: none; }
+  .night .me .bub { background: var(--m-night-soft); }
+  .zh { font-family: var(--cn); font-weight: 500; color: var(--m-gold); font-size: 1.1em; border-bottom: 1px dotted var(--m-gold-line); }
+  .night .zh { color: var(--m-night-gold); border-color: var(--m-night-line); }
+  .cards { display: flex; gap: 0.5em; margin-top: 0.7em; flex-wrap: wrap; }
+  .card { background: var(--m-cream); border: 1px solid var(--m-line); border-radius: 0.65em; padding: 0.55em 0.7em; min-width: 6.6em; }
+  .card.live { background: var(--m-gold-soft); border-color: var(--m-gold); }
+  .card i { font-style: normal; font-family: var(--cn); color: var(--m-gold); font-size: 1.2em; }
+  .card em { font-size: 0.74em; color: var(--m-ink2); margin-left: 0.3em; }
+  .card svg { display: block; width: 3.2em; height: 1.1em; margin: 0.3em 0; }
+  .card small { font-size: 0.74em; color: var(--m-mute); }
+  .inbar { margin: 0 0.7em 1.3em; display: flex; align-items: center; gap: 0.6em; padding: 0.45em 0.45em 0.45em 1em; border: 1px solid var(--m-line); background: var(--m-paper); border-radius: 1.6em; font-size: 1em; color: var(--m-mute); }
+  .inbar > span:first-child { flex: 1; min-width: 0; }
+  .night .inbar { background: var(--m-night2); border-color: var(--m-night-line); color: var(--m-night-mute); }
+  .inbar.rec { background: var(--m-gold-soft); border-color: var(--m-gold); color: var(--m-gold); font-weight: 600; }
+  .night .inbar.rec { background: var(--m-night-soft); border-color: var(--m-night-gold); color: var(--m-night-gold); }
+  .btn { width: 2.5em; height: 2.5em; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--m-line); flex-shrink: 0; position: relative; }
+  .btn.on { background: var(--m-gold); border-color: var(--m-gold); }
+  .night .btn.on { background: var(--m-night-gold); border-color: var(--m-night-gold); }
+  .btn svg { width: 1.05em; height: 1.05em; }
+  .bars { flex: 1; display: flex; align-items: center; gap: 0.2em; height: 1.8em; }
+  .bars u { flex: 1; max-width: 0.26em; border-radius: 0.14em; background: currentColor; height: 20%; text-decoration: none; }
+  .tabs { display: flex; justify-content: space-around; padding: 0.7em 0 1.5em; border-top: 1px solid var(--m-line); font-size: 0.74em; color: var(--m-mute); }
+  .night .tabs { border-color: var(--m-night-line); color: var(--m-night-mute); }
+  .tabs b { color: var(--m-gold); font-weight: 600; }
+  .night .tabs b { color: var(--m-night-gold); }
+
+  /* goal screen (board 3) */
+  .goal { flex: 1; padding: 1.6em 1.3em; display: flex; flex-direction: column; gap: 1.15em; }
+  .goal h3 { font-family: var(--serif); font-weight: 600; font-size: 1.75em; line-height: 1.15; margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.45em; }
+  .chip { padding: 0.45em 0.8em; border-radius: 2em; border: 1px solid var(--m-line); background: var(--m-paper); font-size: 0.9em; font-weight: 500; }
+  .chip.on { background: var(--m-gold-soft); border-color: var(--m-gold); color: var(--m-gold); }
+  .chip.fill { background: var(--m-gold); border-color: var(--m-gold); color: var(--m-btn); }
+  .field { background: var(--m-paper); border: 1px solid var(--m-gold-line); border-radius: 0.9em; padding: 0.85em; font-size: 1em; line-height: 1.45; }
+  .plan { display: flex; gap: 0.6em; background: var(--m-gold-soft); border: 1px solid var(--m-gold-line); border-radius: 0.65em; padding: 0.75em; font-size: 0.9em; line-height: 1.45; color: var(--m-ink2); }
+  .plan i { font-style: normal; font-family: var(--cn); color: var(--m-gold); }
+  .cta { background: var(--m-gold); color: var(--m-btn); text-align: center; padding: 0.9em; border-radius: 0.65em; font-weight: 600; font-size: 1.02em; box-shadow: 0 0.3em 0.9em rgba(139, 106, 58, 0.3); }
+
+  /* ---------- animated preview ---------- */
+  .stage { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 32px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px; }
+  @media (max-width: 720px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+  .screen { container-type: inline-size; width: 100%; max-width: 340px; margin: 0 auto; }
+  .screen .phone { font-size: 4cqw; width: 25em; height: 52em; flex: none; border-bottom: 0.55em solid #1c1a17; border-radius: 3.4em; }
+  .screen .chat { justify-content: flex-start; overflow: hidden; }
+  .step { opacity: 0; transform: translateY(0.7em); transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+  .step.on { opacity: 1; transform: none; }
+  .step.gone { display: none; }
+  .pop { opacity: 0; transform: scale(0.85); transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.22, 1.4, 0.36, 1); }
+  .pop.on { opacity: 1; transform: none; }
+  .dots { display: inline-flex; gap: 0.3em; padding: 0.3em 0; }
+  .dots u { width: 0.38em; height: 0.38em; border-radius: 50%; background: var(--m-mute); animation: bob 1.1s ease-in-out infinite; }
+  .dots u:nth-child(2) { animation-delay: 0.15s; } .dots u:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bob { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-0.3em); opacity: 1; } }
+  .ring { position: absolute; inset: 0; border-radius: 50%; background: var(--m-gold); animation: ring 1.3s ease-out infinite; }
+  @keyframes ring { from { opacity: 0.35; transform: scale(1); } to { opacity: 0; transform: scale(1.9); } }
+  .controls { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .controls ol { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  button.replay { align-self: flex-start; font: 600 14px var(--sans); padding: 10px 16px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); cursor: pointer; }
+  button.replay:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .step, .pop { transition: none; } .dots u, .ring { animation: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Ming for iPhone</p>
+    <h1>App Store screenshots and preview</h1>
+    <p class="note">Three screenshot layouts at the 6.9-inch size (1290 × 2796) and a 15-second loop of the conversation screen. The screens are drawn in HTML to match the app, so treat them as layouts: swap in real captures from a device before you submit.</p>
+  </header>
+
+  <section>
+    <div><h2>Screenshot layouts</h2><p class="note">In order: the conversation, speaking out loud, and the plan built around a goal.</p></div>
+    <div class="boards">
+      <figure>
+        <div class="board"><div class="board-in">
+          <div class="ghost">说</div>
+          <div class="pitch"><b>Speak Mandarin from the first message</b><span>A coach that talks with you, corrects your tones, and keeps it short.</span></div>
+          <div class="phone">
+            <div class="island"></div>
+            <div class="head"><div class="logo">明</div><div><b>Ordering food</b><small>Restaurants, menus, allergies</small></div></div>
+            <div class="chat">
+              <div class="row"><div class="av">明</div><div class="bub">You sit down and the waiter comes over. Ask for tea: <span class="zh">我要茶</span> (wǒ yào chá).
+                <div class="cards"><div class="card live"><i>茶</i><em>chá</em><svg viewBox="0 0 32 11" fill="none" stroke="#8b6a3a" stroke-width="1.6" stroke-linecap="round"><path d="M3 9 29 2"/></svg><small>tea</small></div>
+                <div class="card"><i>要</i><em>yào</em><svg viewBox="0 0 32 11" fill="none" stroke="#8b6a3a" stroke-width="1.6" stroke-linecap="round"><path d="M3 2 29 9"/></svg><small>to want</small></div></div></div></div>
+              <div class="row me"><div class="bub">wo3 yao4 cha2</div></div>
+              <div class="row"><div class="av">明</div><div class="bub"><span class="zh">很好</span>! All three tones were right. Now ask for two cups.</div></div>
+            </div>
+            <div class="inbar"><span>Message Ming (pinyin is fine)</span><span class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="#6a5f52" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 11a7 7 0 0 1-14 0M12 18v4"/></svg></span></div>
+            <div class="tabs"><span>Learn</span><b>Chat</b><span>Words</span><span>Map</span><span>Settings</span></div>
+          </div>
+        </div></div>
+        <figcaption>1 · Conversation, light</figcaption>
+      </figure>
+
+      <figure>
+        <div class="board"><div class="board-in night">
+          <div class="ghost">听</div>
+          <div class="pitch"><b>Say it out loud. Ming listens.</b><span>Tap the mic, speak, and get feedback on what you actually said.</span></div>
+          <div class="phone">
+            <div class="island"></div>
+            <div class="head"><div class="logo">明</div><div><b>Airport &amp; transport</b><small>Taxi, metro, directions</small></div></div>
+            <div class="chat">
+              <div class="row"><div class="av">明</div><div class="bub">You're in the taxi. Tell the driver where you're going: <span class="zh">我去酒店</span> (wǒ qù jiǔdiàn).</div></div>
+              <div class="row me"><div class="bub">我去酒店</div></div>
+              <div class="row"><div class="av">明</div><div class="bub">Clear! Watch <span class="zh">酒</span>: it dips, third tone. Try once more.</div></div>
+            </div>
+            <div class="inbar rec"><span style="flex:none">0:04</span><span class="bars" data-bars="22"></span><span class="btn on"><svg viewBox="0 0 24 24" fill="#0a0a08"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></div>
+            <div class="tabs"><span>Learn</span><b>Chat</b><span>Words</span><span>Map</span><span>Settings</span></div>
+          </div>
+        </div></div>
+        <figcaption>2 · Voice, dark</figcaption>
+      </figure>
+
+      <figure>
+        <div class="board"><div class="board-in gold">
+          <div class="ghost">明</div>
+          <div class="pitch"><b>Built around your trip and your deadline</b><span>Tell Ming why you're learning. Every lesson follows from that.</span></div>
+          <div class="phone">
+            <div class="island"></div>
+            <div class="goal">
+              <div class="logo" style="width:3em;height:3em;font-size:1.3em;border-radius:0.6em">明</div>
+              <h3>What are you learning Mandarin for?</h3>
+              <div class="chips"><span class="chip on">旅 Travel</span><span class="chip">家 Family</span><span class="chip">工 Work</span><span class="chip">根 Heritage</span></div>
+              <div class="field">Two weeks in Chengdu in March, mostly eating my way around</div>
+              <div class="chips"><span class="chip">No deadline</span><span class="chip">2 weeks</span><span class="chip fill">1 month</span><span class="chip">3 months</span></div>
+              <div class="plan"><i>明</i><span>30 days: enough for the essentials plus real conversations.</span></div>
+              <div class="cta">Start learning</div>
+            </div>
+          </div>
+        </div></div>
+        <figcaption>3 · Goal and deadline, gold</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <div><h2>Animated preview</h2><p class="note">One exchange from start to finish. It loops on its own; press Replay to start from the top before you record.</p></div>
+    <div class="stage">
+      <div class="screen"><div class="phone" id="demo" aria-label="Animated preview of a Ming conversation">
+        <div class="island"></div>
+        <div class="head"><div class="logo">明</div><div><b>Greetings</b><small>你好, 谢谢, 再见</small></div></div>
+        <div class="chat">
+          <div class="row step" data-at="400"><div class="av">明</div><div class="bub">Someone holds the door for you. Say thank you: <span class="zh">谢谢</span> (xièxie).
+            <div class="cards"><div class="card pop" data-at="1300"><i>谢谢</i><em>xièxie</em><svg viewBox="0 0 32 11" fill="none" stroke="#8b6a3a" stroke-width="1.6" stroke-linecap="round"><path d="M3 2 14 9M20 6h9"/></svg><small>thank you</small></div></div></div></div>
+          <div class="row me step" data-at="6400"><div class="bub">谢谢</div></div>
+          <div class="row step" data-at="7000" data-until="8600"><div class="av">明</div><div class="bub"><span class="dots"><u></u><u></u><u></u></span></div></div>
+          <div class="row step" data-at="8600"><div class="av">明</div><div class="bub"><span class="zh">很好</span>! Sharp falling tone, then a light one. They'd answer <span class="zh">不客气</span>.
+            <div class="cards"><div class="card pop" data-at="9500"><i>不客气</i><em>bú kèqi</em><svg viewBox="0 0 32 11" fill="none" stroke="#8b6a3a" stroke-width="1.6" stroke-linecap="round"><path d="M3 9 11 3M14 2l7 7M25 6h5"/></svg><small>you're welcome</small></div></div></div></div>
+        </div>
+        <div class="inbar" id="bar"><span id="bar-text">Message Ming (pinyin is fine)</span><span class="bars" id="bar-bars" data-bars="20" hidden></span><span class="btn" id="bar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="#6a5f52" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 11a7 7 0 0 1-14 0M12 18v4"/></svg></span></div>
+        <div class="tabs"><span>Learn</span><b>Chat</b><span>Words</span><span>Map</span><span>Settings</span></div>
+      </div></div>
+      <div class="controls">
+        <button class="replay" id="replay" type="button">Replay from the top</button>
+        <ol>
+          <li>Ming sets a scene and teaches one word.</li>
+          <li>The mic opens and the level bars follow your voice.</li>
+          <li>Your words appear, Ming thinks, then answers with feedback and the next word.</li>
+        </ol>
+        <p class="note">Apple only accepts previews recorded from the app itself, so use this loop as the storyboard for a real device recording, or on the website and social posts as is.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Static level bars for the boards: a fixed, speech-like shape so the still frame looks alive.
+  const SHAPE = [0.2, 0.35, 0.6, 0.9, 0.55, 0.3, 0.7, 1, 0.8, 0.45, 0.25, 0.5, 0.85, 0.65, 0.35, 0.2, 0.55, 0.9, 0.6, 0.3, 0.45, 0.75];
+  document.querySelectorAll("[data-bars]").forEach((el) => {
+    const n = Number(el.dataset.bars);
+    for (let i = 0; i < n; i++) {
+      const u = document.createElement("u");
+      u.style.height = `${SHAPE[i % SHAPE.length] * 100}%`;
+      u.style.opacity = String(0.35 + 0.65 * (i / n));
+      el.appendChild(u);
+    }
+  });
+
+  // The preview: one timeline, restarted every LOOP ms. Times are milliseconds from the start.
+  const LOOP = 15000, REC_FROM = 3000, REC_TO = 6200;
+  const demo = document.getElementById("demo");
+  const bar = document.getElementById("bar"), barText = document.getElementById("bar-text");
+  const barBars = document.getElementById("bar-bars"), barBtn = document.getElementById("bar-btn");
+  const MIC = barBtn.innerHTML;
+  const STOP = '<span class="ring"></span><svg viewBox="0 0 24 24" fill="#fff7ec" style="position:relative"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let timers = [], meter = null;
+
+  function recording(on) {
+    bar.classList.toggle("rec", on);
+    barBtn.classList.toggle("on", on);
+    barBtn.innerHTML = on ? STOP : MIC;
+    barBars.hidden = !on;
+    barText.style.flex = on ? "none" : "";
+    barText.textContent = on ? "0:00" : "Message Ming (pinyin is fine)";
+    clearInterval(meter);
+    if (!on) return;
+    const started = Date.now();
+    meter = setInterval(() => {
+      const t = (Date.now() - started) / 1000;
+      barText.textContent = `0:0${Math.min(Math.floor(t), 9)}`;
+      [...barBars.children].forEach((u, i) => {
+        // Two speech bursts (the two syllables of 谢谢) with a little noise on top.
+        const burst = Math.max(0, Math.sin((t - 0.5) * 2.6)) ** 2;
+        u.style.height = `${12 + (burst * (0.5 + 0.5 * Math.sin(i * 1.7 + t * 9)) + Math.random() * 0.08) * 88}%`;
+      });
+    }, 80);
+  }
+
+  function play() {
+    timers.forEach(clearTimeout);
+    timers = [];
+    recording(false);
+    const steps = demo.querySelectorAll("[data-at]");
+    steps.forEach((el) => el.classList.remove("on", "gone"));
+    if (still) {
+      // Reduced motion: show the finished exchange and stop.
+      steps.forEach((el) => el.classList.add(el.dataset.until ? "gone" : "on"));
+      return;
+    }
+    steps.forEach((el) => {
+      timers.push(setTimeout(() => el.classList.add("on"), Number(el.dataset.at)));
+      if (el.dataset.until) timers.push(setTimeout(() => el.classList.add("gone"), Number(el.dataset.until)));
+    });
+    timers.push(setTimeout(() => recording(true), REC_FROM), setTimeout(() => recording(false), REC_TO), setTimeout(play, LOOP));
+  }
+
+  document.getElementById("replay").addEventListener("click", play);
+  play();
+</script>

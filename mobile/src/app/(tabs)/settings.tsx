@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useState, type ReactNode } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -103,6 +104,10 @@ export default function SettingsScreen() {
               }}
             />
           </Row>
+          <Divider />
+          <ActionRow title="Privacy policy" onPress={() => WebBrowser.openBrowserAsync(`${WEB_URL}/privacy`)} />
+          <Divider />
+          <ActionRow title="Terms of use" onPress={() => WebBrowser.openBrowserAsync(`${WEB_URL}/terms`)} />
         </Group>
 
         <Group label="Account">

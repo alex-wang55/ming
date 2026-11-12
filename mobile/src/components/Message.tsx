@@ -3,6 +3,7 @@ import { Animated, Pressable, Text, View } from "react-native";
 import type { Msg } from "@/lib/store";
 import { cnFont, radius, useMingTheme } from "@/lib/theme";
 import { parseToneTags, stripTags } from "@/shared/tags";
+import { Equalizer, PressableScale, Rise } from "./motion";
 import { ToneGraphs } from "./tones";
 
 const HANZI_RUN = /([一-鿿㐀-䶿]+)/g;
@@ -14,18 +15,32 @@ export type WordTap = (text: string, at: { x: number; top: number; bottom: numbe
 
 const LINE = 24; // lineHeight of message text; used to find the top of the tapped line
 
-type Props = { message: Msg; playing: string | null; onPlay: (text: string) => void; onWord?: WordTap };
+type Props = {
+  message: Msg;
+  playing: string | null;
+  onPlay: (text: string) => void;
+  onWord?: WordTap;
+  // Press and hold one of Ming's replies to report it.
+  onReport?: (content: string) => void;
+  // New messages rise in; the saved history doesn't replay the animation on load.
+  animate?: boolean;
+};
 
 // Port of the web Message.js: Ming on the left with the 明 avatar, you on the right.
 // Chinese in Ming's replies is tappable to hear it, and new words get a card with tone contours.
-export function MessageBubble({ message, playing, onPlay, onWord }: Props) {
+export function MessageBubble({ message, playing, onPlay, onWord, onReport, animate }: Props) {
   const t = useMingTheme();
   const isAI = message.role === "assistant";
+  const reportable = isAI && !message.error && !!onReport;
 
-  return (
+  const row = (
     <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, justifyContent: isAI ? "flex-start" : "flex-end" }}>
       {isAI && <Avatar />}
-      <View
+      <Pressable
+        disabled={!reportable}
+        delayLongPress={450}
+        onLongPress={() => onReport?.(message.content)}
+        accessibilityHint={reportable ? "Press and hold to report this reply" : undefined}
         style={{
           backgroundColor: message.error ? "transparent" : isAI ? t.surface : t.accentSoft,
           borderWidth: 1,
@@ -39,12 +54,19 @@ export function MessageBubble({ message, playing, onPlay, onWord }: Props) {
           paddingHorizontal: 15,
           maxWidth: "85%",
           flexShrink: 1,
+          // Ming's replies sit on a surface with a faint lift; yours stay flat and tinted.
+          shadowColor: "#1f1a14",
+          shadowOpacity: isAI && !message.error && !t.dark ? 0.05 : 0,
+          shadowRadius: 6,
+          shadowOffset: { width: 0, height: 2 },
         }}
       >
         <Content content={message.content} muted={!!message.error} tappable={!message.error} playing={playing} onPlay={onPlay} onWord={onWord} />
-      </View>
+      </Pressable>
     </View>
   );
+
+  return animate ? <Rise>{row}</Rise> : row;
 }
 
 function Avatar() {
@@ -143,30 +165,38 @@ function Content({
 
       {tags.length > 0 && (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-          {tags.map((tag, i) => (
-            <Pressable
-              key={i}
-              onPress={() => onPlay(tag.hanzi)}
-              accessibilityLabel={`Play ${tag.hanzi}, ${tag.meaning}`}
-              style={({ pressed }) => ({
-                backgroundColor: t.bg,
-                borderWidth: 1,
-                borderColor: t.border,
-                borderRadius: 8,
-                paddingVertical: 8,
-                paddingHorizontal: 10,
-                minWidth: 96,
-                opacity: playing === tag.hanzi || pressed ? 0.6 : 1,
-              })}
-            >
-              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 5, marginBottom: 5 }}>
-                <Text style={{ fontFamily: cnFont, fontSize: 16, color: t.accent }}>{tag.hanzi}</Text>
-                <Text style={{ fontSize: 11, color: t.textSecondary, fontStyle: "italic" }}>{tag.pinyin}</Text>
-              </View>
-              <ToneGraphs tones={tag.tones} color={t.accent} height={16} />
-              <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>{tag.meaning}</Text>
-            </Pressable>
-          ))}
+          {tags.map((tag, i) => {
+            const live = playing === tag.hanzi;
+            return (
+              // New-word cards arrive one after another, just after the reply itself.
+              <Rise key={i} index={i + 2}>
+                <PressableScale
+                  onPress={() => onPlay(tag.hanzi)}
+                  accessibilityLabel={`Play ${tag.hanzi}, ${tag.meaning}`}
+                  scaleTo={0.94}
+                  style={{
+                    backgroundColor: live ? t.accentSoft : t.bg,
+                    borderWidth: 1,
+                    borderColor: live ? t.accent : t.border,
+                    borderRadius: radius.md,
+                    paddingVertical: 9,
+                    paddingHorizontal: 11,
+                    minWidth: 104,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 5 }}>
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 5, flexShrink: 1 }}>
+                      <Text style={{ fontFamily: cnFont, fontSize: 18, color: t.accent }}>{tag.hanzi}</Text>
+                      <Text style={{ fontSize: 11.5, color: t.textSecondary, fontStyle: "italic" }}>{tag.pinyin}</Text>
+                    </View>
+                    <Equalizer color={live ? t.accent : t.textFaint} active={live} />
+                  </View>
+                  <ToneGraphs tones={tag.tones} color={t.accent} height={16} />
+                  <Text style={{ fontSize: 11.5, color: t.textMuted, marginTop: 4 }}>{tag.meaning}</Text>
+                </PressableScale>
+              </Rise>
+            );
+          })}
         </View>
       )}
     </View>
