@@ -77,6 +77,10 @@ export async function POST(request) {
   }
 }
 
+function clip(value, max) {
+  return String(value ?? "").slice(0, max);
+}
+
 async function buildContext(db, userId, preferences = {}) {
   const [{ data: profile }, { data: dueWords }, { count: lessonsDone }, { count: wordCount }] = await Promise.all([
     db.from("profiles").select("goal_text, deadline_date").eq("id", userId).maybeSingle(),
@@ -108,7 +112,8 @@ async function buildContext(db, userId, preferences = {}) {
   if (dueWords?.length) {
     lines.push(
       `Words due for review: ${dueWords
-        .map((w) => `${w.chinese} (${w.pinyin}) — ${w.meaning}`)
+        // Users can write their own word rows, so cap what reaches the prompt.
+        .map((w) => `${clip(w.chinese, 20)} (${clip(w.pinyin, 60)}) — ${clip(w.meaning, 80)}`)
         .join(", ")}. Weave these in naturally before introducing anything new.`
     );
   }

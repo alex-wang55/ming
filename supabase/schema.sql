@@ -150,3 +150,6 @@ $$;
 -- quota back, so only the service role may run it.
 revoke execute on function public.consume_daily_quota(uuid, text, integer, integer) from public, anon, authenticated;
 grant execute on function public.consume_daily_quota(uuid, text, integer, integer) to service_role;
+
+-- Then run supabase/migrations/20261112_lesson_state_and_reports.sql (conversations.lesson_id
+-- and the message_reports table).

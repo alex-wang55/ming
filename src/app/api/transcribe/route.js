@@ -1,8 +1,9 @@
 import { transcribeAudio } from "@/lib/ai";
 import { consumeQuota, getUser, jsonError, refundQuota, SIGN_IN_AGAIN } from "@/lib/server";
 
-// Vercel rejects request bodies over ~4.5 MB; a minute of speech is well under this.
-const MAX_BYTES = 4 * 1024 * 1024;
+// Both apps stop recording at a minute, which is about 1 MB at the iPhone's 128 kbps.
+// Whisper bills by the minute, so a tight size cap also limits how long a clip can be.
+const MAX_BYTES = 2 * 1024 * 1024;
 const AUDIO_EXT = /\.(flac|mp3|mp4|mpeg|mpga|m4a|ogg|opus|wav|webm)$/i;
 
 // Transcribes user voice recordings with Whisper (Groq or OpenAI, see lib/ai.js).

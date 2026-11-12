@@ -135,7 +135,28 @@ export async function transcribeAudio(file) {
   const transcription = await client.audio.transcriptions.create({
     file,
     model: useGroq ? GROQ_WHISPER_MODEL : "whisper-1",
-    language: "zh", // hint that it's likely Chinese — improves accuracy
+    // No fixed language: beginners mostly speak English and mix in Mandarin, and forcing
+    // "zh" turned English speech into Chinese characters. The prompt nudges Whisper toward
+    // simplified characters and keeps English as English.
+    prompt: "A Mandarin learner speaking English, 普通话, or both. 你好，我想学中文。",
   });
   return transcription.text;
+}
+
+// Who actually receives data, worked out from the keys that are set. The iOS consent
+// screen shows these names (App Review 5.1.2(i)), so it can't drift from what the server does.
+export function activeProviders() {
+  const groqOn = !!process.env.GROQ_API_KEY;
+  const chat = groqOn
+    ? "Groq"
+    : process.env.ANTHROPIC_API_KEY
+      ? "Anthropic (Claude)"
+      : process.env.OPENAI_API_KEY
+        ? "OpenAI"
+        : null;
+  return {
+    chat,
+    voice: groqOn ? "Groq (Whisper)" : "OpenAI (Whisper)",
+    audio: "Google Cloud Text-to-Speech",
+  };
 }
