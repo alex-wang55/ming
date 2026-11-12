@@ -1,10 +1,10 @@
 import { getAIResponse } from "@/lib/ai";
-import { getAdmin, getUser, jsonError, SIGN_IN_AGAIN } from "@/lib/server";
+import { BUSY, getAdmin, getUser, jsonError, refundUsage, SIGN_IN_AGAIN, takeUsage } from "@/lib/server";
 import { chineseLevelLine } from "@/lib/level";
 import { parseToneTags } from "@/lib/tags";
-
 // Hard daily cap per user, so worst-case AI spend is bounded.
-const DAILY_MESSAGE_LIMIT = 30;
+import { DAILY_MESSAGE_LIMIT } from "@/lib/limits";
+
 // Only the recent conversation is sent to the model, so cost per message stays flat
 // instead of growing with the length of the chat.
 const HISTORY_LIMIT = 20;
@@ -42,53 +42,44 @@ export async function POST(request) {
   }
 
   const db = getAdmin();
-  const today = new Date().toISOString().slice(0, 10);
 
+  // Count the message before calling the model, so the cap holds under parallel requests.
+  let used;
   try {
-    const { data: usage } = await db
-      .from("daily_usage")
-      .select("message_count")
-      .eq("user_id", user.id)
-      .eq("usage_date", today)
-      .maybeSingle();
-    const used = usage?.message_count || 0;
-
-    if (used >= DAILY_MESSAGE_LIMIT) {
-      return jsonError(
-        "You've reached today's message limit. Come back tomorrow — or this is a good moment to review your words.",
-        429,
-        { limitReached: true, remaining: 0 }
-      );
-    }
-
-    const context = await buildContext(db, user.id, body.preferences);
-
-    let reply;
-    try {
-      reply = await getAIResponse(history, context);
-    } catch (err) {
-      console.error("AI provider error:", err);
-      return jsonError("Ming couldn't answer just now. Try again in a moment.", 502);
-    }
-
-    await db
-      .from("daily_usage")
-      .upsert(
-        { user_id: user.id, usage_date: today, message_count: used + 1 },
-        { onConflict: "user_id,usage_date" }
-      );
-
-    const newWords = await saveNewWords(db, user.id, reply);
-
-    return Response.json({
-      reply,
-      newWords,
-      remaining: DAILY_MESSAGE_LIMIT - used - 1,
-    });
-  } catch (error) {
-    console.error("Chat API error:", error);
-    return jsonError("Something went wrong — try again in a moment.", 500);
+    used = await takeUsage(user.id, "chat", DAILY_MESSAGE_LIMIT);
+  } catch (err) {
+    console.error("Usage check failed:", err);
+    return jsonError(BUSY, 503);
   }
+  if (used === null) {
+    return jsonError(
+      "You've reached today's message limit. Come back tomorrow — or this is a good moment to review your words.",
+      429,
+      { limitReached: true, remaining: 0 }
+    );
+  }
+
+  let reply;
+  try {
+    const context = await buildContext(db, user.id, body.preferences);
+    reply = await getAIResponse(history, context);
+  } catch (err) {
+    console.error("AI provider error:", err);
+    await refundUsage(user.id, "chat");
+    return jsonError("Ming couldn't answer just now. Try again in a moment.", 502);
+  }
+
+  const newWords = await saveNewWords(db, user.id, reply);
+
+  return Response.json({
+    reply,
+    newWords,
+    remaining: Math.max(DAILY_MESSAGE_LIMIT - used, 0),
+  });
+}
+
+function clip(value, max) {
+  return String(value ?? "").slice(0, max);
 }
 
 async function buildContext(db, userId, preferences = {}) {
@@ -122,7 +113,8 @@ async function buildContext(db, userId, preferences = {}) {
   if (dueWords?.length) {
     lines.push(
       `Words due for review: ${dueWords
-        .map((w) => `${w.chinese} (${w.pinyin}) — ${w.meaning}`)
+        // Users can write their own word rows, so cap what reaches the prompt.
+        .map((w) => `${clip(w.chinese, 20)} (${clip(w.pinyin, 60)}) — ${clip(w.meaning, 80)}`)
         .join(", ")}. Weave these in naturally before introducing anything new.`
     );
   }

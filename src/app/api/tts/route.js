@@ -1,4 +1,6 @@
-import { getUser, jsonError, SIGN_IN_AGAIN } from "@/lib/server";
+import { getUser, jsonError, refundUsage, SIGN_IN_AGAIN, takeUsage } from "@/lib/server";
+// Hard daily cap per user, so worst-case TTS spend is bounded.
+import { DAILY_TTS_LIMIT } from "@/lib/limits";
 
 const MAX_CHARS = 120;
 
@@ -11,6 +13,16 @@ export async function POST(request) {
     const { text } = await request.json();
     const input = typeof text === "string" ? text.trim().slice(0, MAX_CHARS) : "";
     if (!input) return jsonError("No text provided", 400);
+
+    // Both apps cache clips, so a learner only pays for each word once. This stops loops.
+    let used;
+    try {
+      used = await takeUsage(user.id, "tts", DAILY_TTS_LIMIT);
+    } catch (err) {
+      console.error("Usage check failed:", err);
+      return jsonError("Audio isn't available right now.", 503);
+    }
+    if (used === null) return jsonError("You've reached today's audio limit. It resets tomorrow.", 429, { limitReached: true });
 
     const response = await fetch(
       `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_TTS_API_KEY}`,
@@ -28,6 +40,7 @@ export async function POST(request) {
     const data = await response.json();
     if (!response.ok || !data.audioContent) {
       console.error("TTS provider error:", data.error || response.status);
+      await refundUsage(user.id, "tts");
       return jsonError("Audio isn't available right now.", 502);
     }
 

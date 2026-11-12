@@ -55,6 +55,8 @@ create table public.daily_usage (
   message_count integer default 0,
   unique (user_id, usage_date)
 );
+-- Then run supabase/migrations/20261111_usage_limits.sql (audio and voice counters, plus the
+-- bump_usage / refund_usage functions the API routes need) and 20261112_lesson_state_and_reports.sql.
 
 alter table public.profiles enable row level security;
 alter table public.conversations enable row level security;
