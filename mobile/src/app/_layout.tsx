@@ -69,13 +69,13 @@ function RootStack() {
       <StatusBar style={t.dark ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
         <Stack.Protected guard={!session}>
-          <Stack.Screen name="sign-in" />
+          <Stack.Screen name="sign-in" options={{ animation: "fade" }} />
         </Stack.Protected>
         <Stack.Protected guard={!!session && needsGoal}>
-          <Stack.Screen name="goal-setup" />
+          <Stack.Screen name="goal-setup" options={{ animation: "fade" }} />
         </Stack.Protected>
         <Stack.Protected guard={!!session && !needsGoal}>
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
           <Stack.Screen name="review" options={{ presentation: "modal" }} />
           <Stack.Screen name="consent" options={{ presentation: "modal" }} />
         </Stack.Protected>

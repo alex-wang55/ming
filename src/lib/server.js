@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { DAILY_MESSAGE_LIMIT, DAILY_TRANSCRIBE_LIMIT, DAILY_TTS_LIMIT } from "@/lib/limits";
 
 let admin = null;
 
@@ -26,7 +27,7 @@ export function jsonError(message, status, extra = {}) {
 export const SIGN_IN_AGAIN = "Your session expired. Please sign in again.";
 
 // Daily caps per user, so worst-case provider spend is bounded. Reset at midnight UTC.
-export const DAILY_LIMITS = { message: 30, tts: 300, transcribe: 60 };
+export const DAILY_LIMITS = { message: DAILY_MESSAGE_LIMIT, tts: DAILY_TTS_LIMIT, transcribe: DAILY_TRANSCRIBE_LIMIT };
 
 let quotaMissingLogged = false;
 

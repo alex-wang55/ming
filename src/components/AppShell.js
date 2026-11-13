@@ -4,6 +4,7 @@ import { themes, font, radius } from "@/lib/theme";
 import { LESSONS } from "@/lib/lessons";
 import { useIsMobile } from "@/lib/hooks";
 import { isDue } from "@/lib/review";
+import { STARTERS } from "@/lib/goals";
 import Message from "@/components/Message";
 import ChatInput from "@/components/ChatInput";
 import UserMenu from "@/components/UserMenu";
@@ -153,7 +154,7 @@ export default function AppShell({
 
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           {tab === "learn" && (
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div className="tab-in" style={{ flex: 1, minHeight: 0 }}>
               <LearnTab
                 completedLessons={completedLessons}
                 onStartLesson={onStartLesson}
@@ -172,8 +173,7 @@ export default function AppShell({
 
           {tab === "chat" && (
             <>
-              <main style={{ flex: 1, minHeight: 0, overflowY: "auto", position: "relative", background: t.bg }}>
-                {messages.length === 0 && <EmptyState t={t} />}
+              <main className="tab-in" style={{ flex: 1, minHeight: 0, overflowY: "auto", position: "relative", background: t.bg }}>
                 <div
                   style={{
                     display: "flex",
@@ -189,6 +189,7 @@ export default function AppShell({
                     <Message key={i} message={msg} theme={theme} />
                   ))}
                   {loading && <TypingIndicator t={t} />}
+                  {messages.length === 0 && !loading && <Starters t={t} onPick={onSend} />}
                   <div ref={bottomRef} />
                 </div>
               </main>
@@ -204,6 +205,7 @@ export default function AppShell({
                 <div style={{ maxWidth: "720px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "8px" }}>
                   {currentLesson && (
                     <div
+                      className="fade-up"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -211,25 +213,37 @@ export default function AppShell({
                         gap: "10px",
                         background: t.accentSoft,
                         border: `1px solid ${t.accentBorder}`,
-                        borderRadius: "10px",
-                        padding: "8px 14px",
+                        borderRadius: radius.md,
+                        padding: "8px 8px 8px 14px",
                       }}
                     >
-                      <span style={ellipsis({ fontSize: "12px", color: t.accent })}>Lesson · {currentLesson.title}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent, opacity: 0.75, margin: 0 }}>
+                          Lesson in progress
+                        </p>
+                        <p style={ellipsis({ fontSize: "13.5px", fontWeight: 500, color: t.text, margin: 0 })}>{currentLesson.title}</p>
+                      </div>
                       <button
+                        className="press"
                         onClick={onFinishLesson}
                         style={{
-                          fontSize: "12px",
-                          padding: "5px 12px",
-                          borderRadius: "7px",
-                          background: t.surface,
-                          border: `1px solid ${t.accentBorder}`,
-                          color: t.accent,
-                          fontWeight: 500,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "12.5px",
+                          padding: "7px 12px",
+                          borderRadius: "8px",
+                          background: t.accent,
+                          border: "none",
+                          color: t.btnText,
+                          fontWeight: 600,
                           flexShrink: 0,
                         }}
                       >
-                        Mark complete
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M5 12.5 10 17 19 7" />
+                        </svg>
+                        Complete
                       </button>
                     </div>
                   )}
@@ -247,19 +261,19 @@ export default function AppShell({
           )}
 
           {tab === "map" && (
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div className="tab-in" style={{ flex: 1, minHeight: 0 }}>
               <MapTab onStartLesson={onStartRegion} theme={theme} isMobile={isMobile} />
             </div>
           )}
 
           {tab === "words" && (
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div className="tab-in" style={{ flex: 1, minHeight: 0 }}>
               <WordsTab words={words} loading={wordsLoading} onReview={onStartReview} theme={theme} isMobile={isMobile} />
             </div>
           )}
 
           {tab === "settings" && (
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div className="tab-in" style={{ flex: 1, minHeight: 0 }}>
               <SettingsTab
                 user={user}
                 settings={settings}
@@ -355,24 +369,43 @@ function SearchButton({ t, compact, onClick }) {
   );
 }
 
-function EmptyState({ t }) {
+// Empty chat: three ways in, so the first message is a click rather than a blank box.
+function Starters({ t, onPick }) {
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: "55%",
-        left: "50%",
-        transform: "translate(-50%,-50%)",
-        textAlign: "center",
-        pointerEvents: "none",
-        width: "min(320px, 90%)",
-      }}
-    >
-      <div style={{ fontFamily: font.cn, fontSize: "44px", color: t.accent, opacity: 0.15, marginBottom: "10px" }}>明</div>
-      <p style={{ fontSize: "16px", fontWeight: 500, color: t.textFaint, margin: "0 0 6px" }}>Ready when you are</p>
-      <p style={{ fontSize: "13px", color: t.textFaint, margin: "0 auto" }}>
-        Pick a lesson from the Learn tab, or just start talking.
-      </p>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "32px 0 8px" }}>
+      <div className="rise" style={{ textAlign: "center", marginBottom: "6px" }}>
+        <div style={{ fontFamily: font.cn, fontSize: "44px", lineHeight: 1.1, color: t.accent, opacity: 0.18 }}>明</div>
+        <p style={{ fontSize: "17px", fontWeight: 600, color: t.text, margin: "8px 0 2px" }}>Ready when you are</p>
+        <p style={{ fontSize: "13.5px", color: t.textMuted, margin: 0 }}>Say anything, or start with one of these.</p>
+      </div>
+      {STARTERS.map((s, i) => (
+        <button
+          key={s.id}
+          className="rise press lift"
+          onClick={() => onPick(s.prompt)}
+          style={{
+            "--i": i + 1,
+            width: "min(360px, 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            background: t.surface,
+            border: `1px solid ${t.border}`,
+            borderRadius: radius.md,
+            padding: "12px 16px",
+            fontSize: "14px",
+            fontWeight: 500,
+            color: t.text,
+            textAlign: "left",
+          }}
+        >
+          {s.label}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
+      ))}
     </div>
   );
 }

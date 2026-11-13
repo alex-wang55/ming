@@ -39,3 +39,10 @@ export const LESSONS = [
     ],
   },
 ];
+
+const BY_ID = new Map(LESSONS.flatMap((w) => w.lessons).map((l) => [l.id, l]));
+
+// Used to pick a lesson back up from the id saved on its conversation.
+export function findLesson(id) {
+  return (id && BY_ID.get(id)) || null;
+}
