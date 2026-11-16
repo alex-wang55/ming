@@ -2,7 +2,7 @@
 import { Fragment } from "react";
 import { themes, font, radius } from "@/lib/theme";
 import { ToneGraphs } from "@/components/ToneContour";
-import { parseToneTags, stripTags } from "@/lib/tags";
+import { parseToneTags, stripPartialTag, stripTags } from "@/lib/tags";
 import { useSpeaker } from "@/lib/audio";
 
 const HANZI_RUN = /([一-鿿㐀-䶿]+)/g;
@@ -55,7 +55,7 @@ export default function Message({ message, theme }) {
           boxShadow: message.error ? "none" : t.shadow,
         }}
       >
-        <Content content={message.content} t={t} playing={playing} play={play} muted={message.error} />
+        <Content content={message.streaming ? stripPartialTag(message.content) : message.content} t={t} playing={playing} play={play} muted={message.error} />
       </div>
     </div>
   );

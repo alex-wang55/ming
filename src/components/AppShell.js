@@ -188,7 +188,7 @@ export default function AppShell({
                   {messages.map((msg, i) => (
                     <Message key={i} message={msg} theme={theme} />
                   ))}
-                  {loading && <TypingIndicator t={t} />}
+                  {loading && !messages[messages.length - 1]?.streaming && <TypingIndicator t={t} />}
                   {messages.length === 0 && !loading && <Starters t={t} onPick={onSend} />}
                   <div ref={bottomRef} />
                 </div>

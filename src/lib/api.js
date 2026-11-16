@@ -17,3 +17,20 @@ export function postJSON(path, body) {
     body: JSON.stringify(body),
   });
 }
+
+// Reads a newline-delimited JSON response (the streamed chat reply) one event at a time.
+export async function* readNDJSON(res) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = done ? "" : lines.pop();
+    for (const line of lines) {
+      if (line.trim()) yield JSON.parse(line);
+    }
+    if (done) return;
+  }
+}
