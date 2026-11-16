@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { postJSON } from "@/lib/api";
+import { postJSON, readNDJSON } from "@/lib/api";
 import { speak } from "@/lib/audio";
 import { useSettings } from "@/lib/settings";
 import { localDateKey } from "@/lib/dates";
@@ -212,10 +212,26 @@ export default function Home() {
 
     try {
       const res = await postJSON("/api/chat", {
-        messages: history.filter((m) => !m.error),
+        messages: history.filter((m) => !m.error).map(({ role, content }) => ({ role, content })),
         preferences: { pinyin: settings.pinyin, pace: settings.pace },
+        stream: true,
       });
-      const data = await res.json().catch(() => ({}));
+
+      let data = {};
+      if (res.ok && res.body && (res.headers.get("content-type") || "").includes("ndjson")) {
+        // The reply arrives piece by piece; show it as it grows.
+        let text = "";
+        for await (const event of readNDJSON(res)) {
+          if (event.type === "delta") {
+            text += event.text;
+            setMessages([...history, { role: "assistant", content: text, streaming: true }]);
+          } else {
+            data = event; // "done" or "error"
+          }
+        }
+      } else {
+        data = await res.json().catch(() => ({}));
+      }
       if (typeof data.remaining === "number") setUsageLeft(data.remaining);
 
       if (!res.ok || !data.reply) {

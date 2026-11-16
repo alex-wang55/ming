@@ -14,3 +14,9 @@ export function parseToneTags(text) {
 export function stripTags(text) {
   return text.replace(/\[TONE:[^\]]*\]/g, "");
 }
+
+// While a reply is still streaming, its last tag may be half written ("[TONE:你好|nǐ").
+// Hide that tail so the raw tag never flashes on screen.
+export function stripPartialTag(text) {
+  return text.replace(/\[(?:T(?:O(?:N(?:E(?::[^\]]*)?)?)?)?)?$/, "");
+}

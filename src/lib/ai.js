@@ -86,11 +86,12 @@ function groq() {
   return new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: GROQ_BASE_URL });
 }
 
-export async function getAIResponse(messages, learnerContext = "") {
+// Yields the reply as pieces of text while the provider writes it.
+export async function* streamAIResponse(messages, learnerContext = "") {
   const systemWithContext = MING_SYSTEM_PROMPT + learnerContext;
 
   if (process.env.GROQ_API_KEY) {
-    const response = await groq().chat.completions.create({
+    const stream = await groq().chat.completions.create({
       model: GROQ_CHAT_MODEL,
       // gpt-oss thinks before it answers. Keep that short and out of the reply, and leave
       // room for it, since thinking can use up the token budget before the answer starts.
@@ -98,34 +99,55 @@ export async function getAIResponse(messages, learnerContext = "") {
       include_reasoning: false,
       max_completion_tokens: 2000,
       messages: [{ role: "system", content: systemWithContext }, ...messages],
+      stream: true,
     });
-    const text = response.choices?.[0]?.message?.content?.trim();
-    if (!text) throw new Error(`Groq returned no reply (finish_reason: ${response.choices?.[0]?.finish_reason})`);
-    return text;
+    for await (const chunk of stream) {
+      const text = chunk.choices?.[0]?.delta?.content;
+      if (text) yield text;
+    }
+    return;
   }
 
   if (process.env.ANTHROPIC_API_KEY) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await client.messages.create({
+    const stream = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: MAX_TOKENS,
       system: systemWithContext,
       messages,
+      stream: true,
     });
-    return response.content[0].text;
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta?.type === "text_delta") yield event.delta.text;
+    }
+    return;
   }
 
   if (process.env.OPENAI_API_KEY) {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await client.chat.completions.create({
+    const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: MAX_TOKENS,
       messages: [{ role: "system", content: systemWithContext }, ...messages],
+      stream: true,
     });
-    return response.choices[0].message.content;
+    for await (const chunk of stream) {
+      const text = chunk.choices?.[0]?.delta?.content;
+      if (text) yield text;
+    }
+    return;
   }
 
   throw new Error("No API key found. Add GROQ_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY to your .env.local file.");
+}
+
+// The whole reply at once (the iOS app, and any client that doesn't ask for a stream).
+export async function getAIResponse(messages, learnerContext = "") {
+  let reply = "";
+  for await (const text of streamAIResponse(messages, learnerContext)) reply += text;
+  reply = reply.trim();
+  if (!reply) throw new Error("The AI provider returned an empty reply.");
+  return reply;
 }
 
 // Speech to text with Whisper: Groq's whisper-large-v3 while GROQ_API_KEY is set, else OpenAI.

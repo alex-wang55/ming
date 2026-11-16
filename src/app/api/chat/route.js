@@ -1,4 +1,4 @@
-import { getAIResponse } from "@/lib/ai";
+import { getAIResponse, streamAIResponse } from "@/lib/ai";
 import { consumeQuota, DAILY_LIMITS, getAdmin, getUser, jsonError, refundQuota, SIGN_IN_AGAIN } from "@/lib/server";
 import { chineseLevelLine } from "@/lib/level";
 import { parseToneTags } from "@/lib/tags";
@@ -8,6 +8,7 @@ import { parseToneTags } from "@/lib/tags";
 const HISTORY_LIMIT = 20;
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_NEW_WORDS = 8;
+const AI_FAILED = "Ming couldn't answer just now. Try again in a moment.";
 
 const PINYIN_PREFS = {
   new: "Show pinyin only for words introduced in this conversation. For words the learner already knows, write characters only.",
@@ -54,27 +55,92 @@ export async function POST(request) {
       );
     }
 
+    const remaining = quota.used === null ? undefined : Math.max(DAILY_LIMITS.message - quota.used, 0);
+
+    let context;
+    try {
+      context = await buildContext(db, user.id, body.preferences || {});
+    } catch (err) {
+      console.error("Building learner context failed:", err);
+      await refundQuota(user.id, "message");
+      return jsonError(AI_FAILED, 502);
+    }
+
+    // The web app asks for a stream so the reply appears as it's written.
+    if (body.stream === true) return streamReply(db, user.id, history, context, remaining);
+
     let reply;
     try {
-      const context = await buildContext(db, user.id, body.preferences || {});
       reply = await getAIResponse(history, context);
     } catch (err) {
       console.error("AI provider error:", err);
       await refundQuota(user.id, "message");
-      return jsonError("Ming couldn't answer just now. Try again in a moment.", 502);
+      return jsonError(AI_FAILED, 502);
     }
 
     const newWords = await saveNewWords(db, user.id, reply);
 
-    return Response.json({
-      reply,
-      newWords,
-      remaining: quota.used === null ? undefined : Math.max(DAILY_LIMITS.message - quota.used, 0),
-    });
+    return Response.json({ reply, newWords, remaining });
   } catch (error) {
     console.error("Chat API error:", error);
     return jsonError("Something went wrong — try again in a moment.", 500);
   }
+}
+
+// Sends the reply as newline-delimited JSON: {type:"delta",text} while Ming writes, then one
+// {type:"done",reply,newWords,remaining}, or {type:"error",error} if the provider fails.
+function streamReply(db, userId, history, context, remaining) {
+  const encoder = new TextEncoder();
+  let cancelled = false;
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event) => {
+        if (cancelled) return;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+        } catch {
+          cancelled = true; // the reader went away
+        }
+      };
+
+      let reply = "";
+      try {
+        for await (const text of streamAIResponse(history, context)) {
+          if (cancelled) break;
+          reply += text;
+          send({ type: "delta", text });
+        }
+        reply = reply.trim();
+        if (!cancelled && !reply) throw new Error("The AI provider returned an empty reply.");
+      } catch (err) {
+        console.error("AI provider error:", err);
+        await refundQuota(userId, "message");
+        send({ type: "error", error: AI_FAILED });
+        if (!cancelled) controller.close();
+        return;
+      }
+
+      // A reader that left mid-reply still used the provider, so the message stays counted
+      // (otherwise closing the tab early would be a way around the daily cap).
+      if (cancelled) return;
+
+      const newWords = await saveNewWords(db, userId, reply);
+      send({ type: "done", reply, newWords, remaining });
+      if (!cancelled) controller.close();
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
 
 function clip(value, max) {
