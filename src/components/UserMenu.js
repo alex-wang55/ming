@@ -65,7 +65,7 @@ function Pill({ children, color, bg, border }) {
         gap: "4px",
         padding: "4px 10px",
         borderRadius: "999px",
-        fontSize: "11.5px",
+        fontSize: "12.5px",
         fontWeight: 600,
         background: bg,
         border: `1px solid ${border}`,

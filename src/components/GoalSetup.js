@@ -79,7 +79,7 @@ export default function GoalSetup({ user, theme, onDone }) {
           >
             <span style={{ fontFamily: font.cn, fontSize: "28px", color: t.accent }}>明</span>
           </div>
-          <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: t.accent, margin: "0 0 6px" }}>
+          <p style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: t.accent, margin: "0 0 6px" }}>
             Your goal
           </p>
           <h1 style={{ fontFamily: "Georgia, serif", fontSize: "28px", lineHeight: 1.2, fontWeight: 600, color: t.text, margin: 0 }}>

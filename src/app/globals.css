@@ -5,7 +5,7 @@
 :root {
   --bg: #faf8f4;
   --text: #1f1a14;
-  --muted: #a89d8e;
+  --muted: #7a6f60;
   --border: #e8e0d4;
   --accent: #8b6a3a;
   --accent-soft: #fff7ec;
@@ -15,7 +15,7 @@
 :root[data-theme="dark"] {
   --bg: #0a0a08;
   --text: #f0ece0;
-  --muted: #6b6354;
+  --muted: #8a8170;
   --border: rgba(212,168,67,0.10);
   --accent: #d4a843;
   --accent-soft: rgba(212,168,67,0.07);
@@ -82,6 +82,15 @@ button:disabled { cursor: not-allowed; }
 .press:active:not(:disabled) { transform: scale(0.96); }
 .lift:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(31,26,20,0.10); }
 .lift:active:not(:disabled) { transform: scale(0.96); }
+
+/* Hover feedback for controls styled inline (inline styles can't express :hover).
+   Only on devices that really hover, so nothing sticks after a tap. */
+.hov { transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease, filter 0.15s ease; }
+@media (hover: hover) {
+  .hov:hover:not(:disabled) { background-color: var(--accent-soft) !important; border-color: var(--accent-border) !important; }
+  .hov-solid:hover:not(:disabled) { filter: brightness(1.08); }
+}
+.hov:active:not(:disabled), .hov-solid:active:not(:disabled) { transform: scale(0.97); }
 
 .ring { position: absolute; inset: 0; border-radius: 999px; pointer-events: none; animation: ringPulse 1.3s ease-out infinite; }
 

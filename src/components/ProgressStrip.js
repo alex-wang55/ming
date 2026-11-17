@@ -27,7 +27,7 @@ export default function ProgressStrip({ completedLessons, streak, dueCount = 0, 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginBottom: "6px" }}>
           <span
             style={{
-              fontSize: "11.5px",
+              fontSize: "12.5px",
               color: t.text,
               fontWeight: 500,
               overflow: "hidden",
@@ -37,7 +37,7 @@ export default function ProgressStrip({ completedLessons, streak, dueCount = 0, 
           >
             {week.weekTitle}
           </span>
-          <span style={{ fontSize: "11px", color: t.accent, fontWeight: 600, flexShrink: 0 }}>
+          <span style={{ fontSize: "12px", color: t.accent, fontWeight: 600, flexShrink: 0 }}>
             {done} / {week.lessons.length}
           </span>
         </div>
@@ -74,12 +74,13 @@ function Stat({ value, label, color, t, onClick }) {
   const content = (
     <>
       <p style={{ fontSize: "16px", fontWeight: 700, color, margin: 0, lineHeight: 1.1 }}>{value}</p>
-      <p style={{ fontSize: "9.5px", color: t.textMuted, margin: 0, whiteSpace: "nowrap" }}>{label}</p>
+      <p style={{ fontSize: "10.5px", color: t.textMuted, margin: 0, whiteSpace: "nowrap" }}>{label}</p>
     </>
   );
   if (!onClick) return <div style={{ textAlign: "center", flexShrink: 0 }}>{content}</div>;
   return (
     <button
+      className="hov-solid"
       onClick={onClick}
       title="Start a review"
       style={{

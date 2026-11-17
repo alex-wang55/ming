@@ -163,7 +163,7 @@ export default function CommandPalette({ open, onClose, theme, words = [], onSel
             <div key={group.label}>
               <p
                 style={{
-                  fontSize: "9px",
+                  fontSize: "10px",
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
@@ -211,7 +211,7 @@ export default function CommandPalette({ open, onClose, theme, words = [], onSel
                         <span style={{ fontSize: "13px", color: t.text, flex: 1 }}>
                           {item.title || item.label}
                         </span>
-                        {item.week && <span style={{ fontSize: "10px", color: t.textMuted }}>{item.week}</span>}
+                        {item.week && <span style={{ fontSize: "11px", color: t.textMuted }}>{item.week}</span>}
                       </>
                     )}
                   </button>
@@ -234,7 +234,7 @@ export default function CommandPalette({ open, onClose, theme, words = [], onSel
             ["up down", "navigate"],
             ["esc", "close"],
           ].map(([k, l]) => (
-            <span key={k} style={{ fontSize: "10px", color: t.textFaint }}>
+            <span key={k} style={{ fontSize: "11px", color: t.textFaint }}>
               <span
                 style={{
                   border: `1px solid ${t.border}`,

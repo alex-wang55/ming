@@ -140,7 +140,7 @@ export default function Auth({ theme = "light", recovery = false, onRecovered })
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {[
                 "Goal-aware lessons built around your timeline",
-                "Real conversations, not flashcard drills",
+                "Real conversations, with review of every new word",
                 "Pronunciation audio for every word",
                 "Works on your phone and computer",
               ].map((p) => (
@@ -192,30 +192,34 @@ export default function Auth({ theme = "light", recovery = false, onRecovered })
         )}
 
         {mode !== "update" && (
-          <input
-            style={inputStyle}
-            type="email"
-            name="email"
-            autoComplete="email"
-            required
-            placeholder="Email address"
-            aria-label="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <label style={labelStyle(t)}>
+            Email
+            <input
+              style={inputStyle}
+              type="email"
+              name="email"
+              autoComplete="email"
+              required
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
         )}
         {mode !== "forgot" && (
-          <input
-            style={inputStyle}
-            type="password"
-            name="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            required
-            placeholder={mode === "login" ? "Password" : "New password (8+ characters)"}
-            aria-label="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <label style={labelStyle(t)}>
+            {mode === "login" ? "Password" : "New password"}
+            <input
+              style={inputStyle}
+              type="password"
+              name="password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              required
+              placeholder={mode === "login" ? "" : "8+ characters"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
         )}
 
         {error && (
@@ -256,7 +260,7 @@ export default function Auth({ theme = "light", recovery = false, onRecovered })
           </button>
         )}
         {(mode === "login" || mode === "signup") && (
-          <p style={{ fontSize: "11.5px", color: t.textMuted, textAlign: "center", margin: 0 }}>
+          <p style={{ fontSize: "12.5px", color: t.textMuted, textAlign: "center", margin: 0 }}>
             {mode === "signup" ? "By creating an account you agree to the " : "See the "}
             <a href="/terms" style={{ color: t.accent }}>
               Terms
@@ -271,6 +275,10 @@ export default function Auth({ theme = "light", recovery = false, onRecovered })
       </form>
     </div>
   );
+}
+
+function labelStyle(t) {
+  return { display: "flex", flexDirection: "column", gap: "6px", fontSize: "12.5px", fontWeight: 500, color: t.textSecondary };
 }
 
 function linkStyle(t) {

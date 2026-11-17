@@ -215,7 +215,7 @@ export default function SettingsTab({ user, settings, updateSettings, profile, o
           </Row>
         </Group>
 
-        <p style={{ fontSize: "11px", color: t.textFaint, textAlign: "center", margin: "6px 0 0" }}>
+        <p style={{ fontSize: "12px", color: t.textFaint, textAlign: "center", margin: "6px 0 0" }}>
           Settings save automatically · Ming v1.1
         </p>
       </div>
@@ -228,7 +228,7 @@ function Group({ label, children, t }) {
     <section>
       <p
         style={{
-          fontSize: "10px",
+          fontSize: "11px",
           fontWeight: 700,
           letterSpacing: "0.12em",
           textTransform: "uppercase",

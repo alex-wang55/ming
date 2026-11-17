@@ -60,6 +60,8 @@ export default function AppShell({
   onRate,
   onCloseReview,
   onUpdateProfile,
+  finished,
+  onDismissFinished,
 }) {
   const theme = settings.theme;
   const t = themes[theme];
@@ -71,6 +73,10 @@ export default function AppShell({
 
   const dueCount = useMemo(() => words.filter((w) => isDue(w)).length, [words]);
   const welcome = useMemo(() => welcomeFor(profile), [profile]);
+  const nextLesson = useMemo(
+    () => LESSONS.flatMap((w) => w.lessons).find((l) => !completedLessons.includes(l.id)) || null,
+    [completedLessons]
+  );
 
   useEffect(() => {
     if (tab === "chat") bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -157,7 +163,9 @@ export default function AppShell({
             <div className="tab-in" style={{ flex: 1, minHeight: 0 }}>
               <LearnTab
                 completedLessons={completedLessons}
-                onStartLesson={onStartLesson}
+                // The lesson already under way reopens its chat instead of starting over.
+                onStartLesson={(lesson) => (lesson.id === currentLesson?.id ? setTab("chat") : onStartLesson(lesson))}
+                currentLessonId={currentLesson?.id}
                 wordCount={words.length}
                 dueCount={dueCount}
                 onReview={onStartReview}
@@ -218,13 +226,13 @@ export default function AppShell({
                       }}
                     >
                       <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent, opacity: 0.75, margin: 0 }}>
+                        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent, opacity: 0.75, margin: 0 }}>
                           Lesson in progress
                         </p>
                         <p style={ellipsis({ fontSize: "13.5px", fontWeight: 500, color: t.text, margin: 0 })}>{currentLesson.title}</p>
                       </div>
                       <button
-                        className="press"
+                        className="press hov-solid"
                         onClick={onFinishLesson}
                         style={{
                           display: "flex",
@@ -300,6 +308,22 @@ export default function AppShell({
         isMobile={isMobile}
       />
 
+      {finished && (
+        <LessonDone
+          key={finished.id}
+          finished={finished}
+          total={TOTAL_LESSONS}
+          next={nextLesson}
+          t={t}
+          isMobile={isMobile}
+          onNext={() => {
+            onDismissFinished();
+            onStartLesson(nextLesson);
+          }}
+          onClose={onDismissFinished}
+        />
+      )}
+
       {review && (
         <Checkpoint
           key={review.id}
@@ -310,6 +334,90 @@ export default function AppShell({
           onClose={onCloseReview}
         />
       )}
+    </div>
+  );
+}
+
+// A short moment after "Complete": what was finished, how far along, and the next step.
+// It closes itself, so it never blocks the lesson path underneath.
+function LessonDone({ finished, total, next, t, isMobile, onNext, onClose }) {
+  useEffect(() => {
+    const id = setTimeout(onClose, 7000);
+    return () => clearTimeout(id);
+  }, []);
+
+  return (
+    <div
+      role="status"
+      className="pop"
+      style={{
+        position: "fixed",
+        // Bottom centre: clear of the header controls, and above the tab bar on phones.
+        bottom: isMobile ? "calc(env(safe-area-inset-bottom) + 70px)" : "28px",
+        left: "50%",
+        translate: "-50% 0",
+        zIndex: 40,
+        width: "min(440px, calc(100vw - 24px))",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        background: t.bgElevated,
+        border: `1px solid ${t.successBorder}`,
+        borderRadius: radius.lg,
+        boxShadow: t.shadowLg,
+        padding: "12px 12px 12px 14px",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          width: "34px",
+          height: "34px",
+          borderRadius: radius.full,
+          background: t.successSoft,
+          border: `1px solid ${t.successBorder}`,
+          color: t.success,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12.5 10 17 19 7" />
+        </svg>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={ellipsis({ fontSize: "14px", fontWeight: 600, color: t.text, margin: 0 })}>{finished.title} complete</p>
+        <p style={{ fontSize: "12.5px", color: t.textSecondary, margin: 0 }}>
+          {finished.done} of {total} lessons done
+        </p>
+      </div>
+      {next && (
+        <button
+          className="press hov-solid"
+          onClick={onNext}
+          style={{
+            fontSize: "12.5px",
+            fontWeight: 600,
+            padding: "8px 12px",
+            borderRadius: "8px",
+            background: t.accent,
+            border: "none",
+            color: t.btnText,
+            flexShrink: 0,
+          }}
+        >
+          Next lesson
+        </button>
+      )}
+      <button
+        onClick={onClose}
+        aria-label="Dismiss"
+        style={{ width: "28px", height: "28px", border: "none", background: "transparent", color: t.textMuted, fontSize: "18px", lineHeight: 1, flexShrink: 0 }}
+      >
+        ×
+      </button>
     </div>
   );
 }
@@ -326,6 +434,7 @@ function SearchButton({ t, compact, onClick }) {
 
   return (
     <button
+      className="hov"
       onClick={onClick}
       aria-label="Search lessons and words"
       title={`Search (${shortcut})`}
@@ -354,7 +463,7 @@ function SearchButton({ t, compact, onClick }) {
           <kbd
             style={{
               fontFamily: "inherit",
-              fontSize: "10px",
+              fontSize: "11px",
               border: `1px solid ${t.border}`,
               borderRadius: "4px",
               padding: "1px 5px",

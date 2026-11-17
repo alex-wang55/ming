@@ -364,14 +364,14 @@ function makeStyles(t, isMobile) {
     placeholderTitle: { fontSize: "16px", fontWeight: 500, color: t.text, margin: 0 },
     placeholderText: { fontSize: "13px", color: t.textMuted, maxWidth: "240px", lineHeight: 1.6, margin: 0 },
     detailHeader: { marginBottom: "8px" },
-    typeBadge: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", fontWeight: 500 },
+    typeBadge: { fontSize: "12px", padding: "3px 10px", borderRadius: "20px", fontWeight: 500 },
     detailChinese: { fontSize: "32px", fontFamily: font.cn, color: t.accent, margin: "8px 0 2px", fontWeight: 500, lineHeight: 1 },
     detailName: { fontSize: "18px", color: t.text, fontWeight: 500, margin: "0 0 14px", fontFamily: "Georgia, serif" },
     section: { marginBottom: "10px", padding: "12px 14px", background: t.surface, borderRadius: radius.md, border: `1px solid ${t.border}` },
     sectionTitle: { fontSize: "12px", fontWeight: 600, color: t.textSecondary, margin: "0 0 6px" },
     detailText: { fontSize: "13px", color: t.textSecondary, lineHeight: "1.6", margin: 0 },
     scenarioList: { display: "flex", flexWrap: "wrap", gap: "5px" },
-    scenarioPill: { fontSize: "11px", padding: "3px 9px", borderRadius: "20px", background: t.accentSoft, border: `1px solid ${t.accentBorder}`, color: t.accent },
+    scenarioPill: { fontSize: "12px", padding: "3px 9px", borderRadius: "20px", background: t.accentSoft, border: `1px solid ${t.accentBorder}`, color: t.accent },
     startBtn: { width: "100%", marginTop: "14px", padding: "12px", borderRadius: radius.md, background: t.accent, border: "none", color: t.btnText, fontSize: "14px", fontWeight: 500, cursor: "pointer", fontFamily: "Georgia, serif" },
   };
 }
