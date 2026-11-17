@@ -124,7 +124,7 @@ function Content({ content, t, playing, play, muted }) {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "5px" }}>
                   <span style={{ display: "flex", alignItems: "baseline", gap: "5px" }}>
                     <span style={{ fontFamily: font.cn, fontSize: "17px", color: t.accent }}>{tag.hanzi}</span>
-                    <span style={{ fontSize: "11px", color: t.textSecondary, fontStyle: "italic" }}>{tag.pinyin}</span>
+                    <span style={{ fontSize: "12px", color: t.textSecondary, fontStyle: "italic" }}>{tag.pinyin}</span>
                   </span>
                   <span className={live ? "eq on" : "eq"} aria-hidden>
                     {[0, 1, 2].map((b) => (
@@ -133,7 +133,7 @@ function Content({ content, t, playing, play, muted }) {
                   </span>
                 </div>
                 <ToneGraphs tones={tag.tones} color={t.accent} height={16} />
-                <p style={{ fontSize: "11px", color: t.textMuted, margin: "4px 0 0" }}>{tag.meaning}</p>
+                <p style={{ fontSize: "12px", color: t.textMuted, margin: "4px 0 0" }}>{tag.meaning}</p>
               </button>
             );
           })}

@@ -45,7 +45,7 @@ export function BottomNav({ tab, setTab, theme, dueCount = 0 }) {
             }}
           >
             <Icon />
-            <span style={{ fontSize: "10.5px", fontWeight: active ? 600 : 500 }}>{item.label}</span>
+            <span style={{ fontSize: "11.5px", fontWeight: active ? 600 : 500 }}>{item.label}</span>
             {item.id === "words" && dueCount > 0 && <Badge t={t}>{dueCount}</Badge>}
           </button>
         );
@@ -137,6 +137,7 @@ function NavButton({ item, active, onClick, badge = 0, t }) {
   const Icon = item.icon;
   return (
     <button
+      className="hov"
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       style={{
@@ -156,7 +157,7 @@ function NavButton({ item, active, onClick, badge = 0, t }) {
       }}
     >
       <Icon />
-      <span style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.01em" }}>{item.label}</span>
+      <span style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "0.01em" }}>{item.label}</span>
       {badge > 0 && <Badge t={t}>{badge}</Badge>}
     </button>
   );

@@ -34,7 +34,7 @@ export default function StreakCalendar({ activity = [], streak = 0, theme, weeks
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "11px" }}>
         <span
           style={{
-            fontSize: "9px",
+            fontSize: "10px",
             fontWeight: 700,
             letterSpacing: "0.1em",
             textTransform: "uppercase",
@@ -65,7 +65,7 @@ export default function StreakCalendar({ activity = [], streak = 0, theme, weeks
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "5px", justifyContent: "flex-end" }}>
-        <span style={{ fontSize: "9px", color: t.textFaint }}>Less</span>
+        <span style={{ fontSize: "10px", color: t.textFaint }}>Less</span>
         {levels.map((bg, i) => (
           <div
             key={i}
@@ -78,7 +78,7 @@ export default function StreakCalendar({ activity = [], streak = 0, theme, weeks
             }}
           />
         ))}
-        <span style={{ fontSize: "9px", color: t.textFaint }}>More</span>
+        <span style={{ fontSize: "10px", color: t.textFaint }}>More</span>
       </div>
     </div>
   );

@@ -95,7 +95,7 @@ export default function Checkpoint({ words, title = "Review", theme, onRate, onC
           <>
             <p
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",

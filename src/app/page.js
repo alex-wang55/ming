@@ -36,6 +36,7 @@ export default function Home() {
   const [activity, setActivity] = useState([]);
   const [currentLesson, setCurrentLesson] = useState(null);
   const [review, setReview] = useState(null);
+  const [finished, setFinished] = useState(null);
   const conversationId = useRef(null);
   const loadedUserId = useRef(null);
   const sending = useRef(false);
@@ -89,6 +90,7 @@ export default function Home() {
     setStreak(0);
     setLesson(null);
     setReview(null);
+    setFinished(null);
     setUsageLeft(null);
     setTab("learn");
   }
@@ -293,6 +295,7 @@ export default function Home() {
       supabase.from("conversations").update({ lesson_id: null }).eq("id", conversationId.current).then(() => {});
     }
     setTab("learn");
+    setFinished({ id: Date.now(), title: currentLesson.title, done: next.length });
 
     // Every 3rd lesson: a quick check on the most recent words.
     if (next.length % 3 === 0 && words.length) {
@@ -358,6 +361,8 @@ export default function Home() {
       onRate={rateWord}
       onCloseReview={() => setReview(null)}
       onUpdateProfile={updateProfile}
+      finished={finished}
+      onDismissFinished={() => setFinished(null)}
     />
   );
 }

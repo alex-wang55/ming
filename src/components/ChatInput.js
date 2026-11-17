@@ -227,7 +227,7 @@ export default function ChatInput({ onSend, disabled, theme, compact = false, us
           key={error || hint}
           className="fade-up"
           role={error ? "alert" : undefined}
-          style={{ fontSize: "11px", color: error ? t.danger : t.textFaint, textAlign: "center", margin: 0 }}
+          style={{ fontSize: "12px", color: error ? t.danger : t.textFaint, textAlign: "center", margin: 0 }}
         >
           {error || hint}
         </p>
@@ -301,7 +301,7 @@ function RecordingBar({ stream, t }) {
           />
         ))}
       </div>
-      <span style={{ fontSize: "11.5px", color: t.textMuted, flexShrink: 0 }}>Tap to send</span>
+      <span style={{ fontSize: "12.5px", color: t.textMuted, flexShrink: 0 }}>Tap to send</span>
     </div>
   );
 }

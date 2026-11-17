@@ -58,7 +58,7 @@ export function ToneCard({ hanzi, pinyin, tone, meaning, theme, onPlay, playing 
         <span style={{ fontSize: "12px", color: t.textSecondary, fontStyle: "italic" }}>{pinyin}</span>
       </div>
       <ToneGraph tone={tone} color={t.accent} />
-      <p style={{ fontSize: "11px", color: t.textMuted, margin: "6px 0 0" }}>
+      <p style={{ fontSize: "12px", color: t.textMuted, margin: "6px 0 0" }}>
         {c.label} · {meaning}
       </p>
     </button>
@@ -78,7 +78,7 @@ export default function ToneReference({ theme, onPlay, playing }) {
     <div>
       <p
         style={{
-          fontSize: "10px",
+          fontSize: "11px",
           fontWeight: 700,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
@@ -99,7 +99,7 @@ export default function ToneReference({ theme, onPlay, playing }) {
           />
         ))}
       </div>
-      <p style={{ fontSize: "11.5px", color: t.textMuted, margin: "10px 0 0", lineHeight: 1.55 }}>
+      <p style={{ fontSize: "12.5px", color: t.textMuted, margin: "10px 0 0", lineHeight: 1.55 }}>
         Same syllable, four meanings. This is why tone accuracy matters more in Mandarin than in most languages.
         {onPlay && " Tap a card to hear it."}
       </p>

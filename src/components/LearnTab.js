@@ -18,6 +18,7 @@ export default function LearnTab({
   goalText,
   deadlineDate,
   isMobile,
+  currentLessonId,
 }) {
   const t = themes[theme];
   const [playing, play] = useSpeaker();
@@ -97,7 +98,7 @@ export default function LearnTab({
                   </div>
                   <span
                     style={{
-                      fontSize: "10px",
+                      fontSize: "11px",
                       fontWeight: 600,
                       letterSpacing: "0.08em",
                       color: weekDone === week.lessons.length ? t.success : t.textFaint,
@@ -126,6 +127,7 @@ export default function LearnTab({
                         <LessonRow
                           lesson={lesson}
                           state={state}
+                          inProgress={lesson.id === currentLessonId}
                           t={t}
                           onClick={() => state !== "locked" && onStartLesson(lesson)}
                         />
@@ -146,13 +148,14 @@ export default function LearnTab({
   );
 }
 
-function LessonRow({ lesson, state, t, onClick }) {
+function LessonRow({ lesson, state, inProgress, t, onClick }) {
   const done = state === "done";
   const active = state === "active";
   const locked = state === "locked";
 
   return (
     <button
+      className="hov"
       onClick={onClick}
       disabled={locked}
       style={{
@@ -165,7 +168,7 @@ function LessonRow({ lesson, state, t, onClick }) {
         gap: "13px",
         background: active ? t.accentSoft : t.surface,
         border: `1px solid ${done ? t.successBorder : active ? t.accentBorder : t.border}`,
-        opacity: locked ? 0.42 : 1,
+        opacity: locked ? 0.6 : 1,
         cursor: locked ? "not-allowed" : "pointer",
         boxShadow: active ? t.shadowLg : t.shadow,
         transition: "all 0.15s ease",
@@ -201,7 +204,7 @@ function LessonRow({ lesson, state, t, onClick }) {
         </p>
         <p
           style={{
-            fontSize: "11.5px",
+            fontSize: "12.5px",
             color: t.textMuted,
             margin: 0,
             overflow: "hidden",
@@ -216,7 +219,7 @@ function LessonRow({ lesson, state, t, onClick }) {
       {active && (
         <span
           style={{
-            fontSize: "11px",
+            fontSize: "12px",
             fontWeight: 600,
             color: t.accent,
             display: "flex",
@@ -225,7 +228,7 @@ function LessonRow({ lesson, state, t, onClick }) {
             flexShrink: 0,
           }}
         >
-          Continue <ChevronIcon />
+          {inProgress ? "Continue" : "Start"} <ChevronIcon />
         </span>
       )}
     </button>

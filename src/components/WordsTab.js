@@ -42,6 +42,7 @@ export default function WordsTab({ words, loading, onReview, theme, isMobile }) 
         <div style={{ flex: 1 }} />
         {due.length > 0 && (
           <button
+            className="hov-solid"
             onClick={onReview}
             style={{
               padding: "7px 16px",
@@ -75,6 +76,7 @@ export default function WordsTab({ words, loading, onReview, theme, isMobile }) 
             return (
               <button
                 key={w.id}
+                className="hov"
                 onClick={() => play(w.chinese)}
                 title="Play pronunciation"
                 style={{
@@ -104,11 +106,11 @@ export default function WordsTab({ words, loading, onReview, theme, isMobile }) 
                   </span>
                   <SpeakerIcon color={t.textMuted} />
                 </div>
-                <p style={{ fontSize: "11.5px", fontStyle: "italic", color: t.textSecondary, margin: "0 0 3px" }}>{w.pinyin}</p>
+                <p style={{ fontSize: "12.5px", fontStyle: "italic", color: t.textSecondary, margin: "0 0 3px" }}>{w.pinyin}</p>
                 <p style={{ fontSize: "13px", color: t.text, margin: "0 0 9px" }}>{w.meaning}</p>
                 <span
                   style={{
-                    fontSize: "10px",
+                    fontSize: "11px",
                     fontWeight: wordDue ? 700 : 400,
                     color: wordDue ? t.accent : t.textFaint,
                     letterSpacing: wordDue ? "0.04em" : 0,
@@ -128,6 +130,7 @@ export default function WordsTab({ words, loading, onReview, theme, isMobile }) 
 function FilterTab({ children, active, onClick, t }) {
   return (
     <button
+      className="hov"
       onClick={onClick}
       aria-pressed={active}
       style={{

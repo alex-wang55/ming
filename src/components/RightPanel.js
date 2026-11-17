@@ -84,15 +84,15 @@ export default function RightPanel({
         <p style={{ fontFamily: font.cn, fontSize: "30px", fontWeight: 500, color: t.accent, margin: "0 0 2px", lineHeight: 1 }}>
           {word.chinese}
         </p>
-        <p style={{ fontSize: "11.5px", fontStyle: "italic", color: t.textSecondary, margin: "0 0 2px" }}>{word.pinyin}</p>
-        <p style={{ fontSize: "11.5px", color: t.textSecondary, margin: "0 0 9px" }}>{word.meaning}</p>
+        <p style={{ fontSize: "12.5px", fontStyle: "italic", color: t.textSecondary, margin: "0 0 2px" }}>{word.pinyin}</p>
+        <p style={{ fontSize: "12.5px", color: t.textSecondary, margin: "0 0 9px" }}>{word.meaning}</p>
         <button
           onClick={() => play(word.chinese)}
           style={{
             display: "flex",
             alignItems: "center",
             gap: "5px",
-            fontSize: "11px",
+            fontSize: "12px",
             fontWeight: 600,
             color: t.accent,
             background: "none",
@@ -126,7 +126,7 @@ export default function RightPanel({
           <p style={{ fontSize: "22px", fontWeight: 700, color: days <= 3 ? t.danger : t.accent, margin: "0 0 4px" }}>
             {Math.max(days, 0)}
           </p>
-          {goalText && <p style={{ fontSize: "11px", color: t.textSecondary, margin: 0, lineHeight: 1.5 }}>{goalText}</p>}
+          {goalText && <p style={{ fontSize: "12px", color: t.textSecondary, margin: 0, lineHeight: 1.5 }}>{goalText}</p>}
         </Card>
       )}
 
@@ -156,7 +156,7 @@ export default function RightPanel({
                 top: "50%",
                 left: "50%",
                 transform: "translate(-50%,-50%)",
-                fontSize: "9.5px",
+                fontSize: "10.5px",
                 fontWeight: 700,
                 color: t.accent,
               }}
@@ -166,10 +166,10 @@ export default function RightPanel({
           </div>
           <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: "12px", fontWeight: 600, color: t.text, margin: "0 0 1px" }}>Course progress</p>
-            <p style={{ fontSize: "10.5px", color: t.textMuted, margin: 0 }}>
+            <p style={{ fontSize: "11.5px", color: t.textMuted, margin: 0 }}>
               {done} of {allLessons.length} lessons
             </p>
-            <p style={{ fontSize: "10.5px", color: t.textMuted, margin: 0 }}>
+            <p style={{ fontSize: "11.5px", color: t.textMuted, margin: 0 }}>
               {wordCount} word{wordCount === 1 ? "" : "s"} learned
             </p>
           </div>
@@ -190,13 +190,13 @@ export default function RightPanel({
           >
             <Label t={t}>Up next</Label>
             <p style={{ fontSize: "12.5px", fontWeight: 600, color: t.text, margin: "0 0 2px" }}>{next.title}</p>
-            <p style={{ fontSize: "10.5px", color: t.textMuted, margin: "0 0 9px" }}>{next.sub}</p>
+            <p style={{ fontSize: "11.5px", color: t.textMuted, margin: "0 0 9px" }}>{next.sub}</p>
             <span
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "5px",
-                fontSize: "10.5px",
+                fontSize: "11.5px",
                 fontWeight: 600,
                 color: t.btnText,
                 background: t.accent,
@@ -210,7 +210,7 @@ export default function RightPanel({
         ) : (
           <Card t={t}>
             <p style={{ fontSize: "12.5px", fontWeight: 600, color: t.success, margin: "0 0 3px" }}>All lessons done</p>
-            <p style={{ fontSize: "10.5px", color: t.textMuted, margin: 0 }}>Try the map for regional practice</p>
+            <p style={{ fontSize: "11.5px", color: t.textMuted, margin: 0 }}>Try the map for regional practice</p>
           </Card>
         ))}
     </aside>
@@ -221,7 +221,7 @@ function Label({ children, t, color }) {
   return (
     <p
       style={{
-        fontSize: "9px",
+        fontSize: "10px",
         fontWeight: 700,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
